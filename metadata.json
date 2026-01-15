@@ -1,0 +1,7 @@
+{
+  "name": "GoQuantum - Transporte Interprovincial",
+  "description": "Sistema profissional de transporte interprovincial e encomendas em Moçambique, com áreas para passageiros, motoristas e administradores.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
