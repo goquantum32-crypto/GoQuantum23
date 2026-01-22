@@ -7,6 +7,7 @@ import PassengerArea from './components/PassengerArea';
 import DriverArea from './components/DriverArea';
 import AdminArea from './components/AdminArea';
 import AuthModal from './components/AuthModal';
+import { validateUserStructure } from './utils/security';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -21,11 +22,19 @@ const App: React.FC = () => {
       const savedTrips = localStorage.getItem('gq_trips');
       const savedPackages = localStorage.getItem('gq_packages');
       const savedUsers = localStorage.getItem('gq_users');
+      
+      // Validação de Segurança Básica ao carregar
       if (savedTrips) setTrips(JSON.parse(savedTrips));
       if (savedPackages) setPackages(JSON.parse(savedPackages));
-      if (savedUsers) setUsers(JSON.parse(savedUsers));
+      
+      if (savedUsers) {
+        const parsedUsers = JSON.parse(savedUsers);
+        // Filtra utilizadores mal formados que podem ter sido injetados
+        const validUsers = Array.isArray(parsedUsers) ? parsedUsers.filter(validateUserStructure) : [];
+        setUsers(validUsers);
+      }
     } catch (e) {
-      console.error("Erro ao carregar dados locais:", e);
+      console.error("Erro ao carregar ou validar dados locais. Dados corrompidos foram ignorados.", e);
     }
   }, []);
 
@@ -79,7 +88,9 @@ const App: React.FC = () => {
             users={users}
             onUpdateUser={handleUpdateUser}
             onSubmitTrip={(t) => setTrips(prev => [t, ...prev])} 
+            onUpdateTrip={(ut) => setTrips(prev => prev.map(t => t.id === ut.id ? ut : t))}
             onSubmitPackage={(p) => setPackages(prev => [p, ...prev])}
+            onUpdatePackage={(up) => setPackages(prev => prev.map(p => p.id === up.id ? up : p))}
             trips={trips.filter(t => t.passengerId === currentUser.id)} 
             packages={packages.filter(p => p.passengerId === currentUser.id)}
           />

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
+import { sanitizeInput, checkAdminCredentials } from '../utils/security';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -19,6 +20,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
     photoUrl: '', licenseUrl: ''
   });
 
+  // Segurança: Estados para Rate Limiting (Proteção contra força bruta)
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
+
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -29,11 +35,36 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
     }
   }, [isOpen]);
 
+  // Efeito para gerir o temporizador de bloqueio
+  useEffect(() => {
+    let interval: any;
+    if (isLocked && lockoutTimer > 0) {
+      interval = setInterval(() => {
+        setLockoutTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (lockoutTimer === 0) {
+      setIsLocked(false);
+      setLoginAttempts(0);
+    }
+    return () => clearInterval(interval);
+  }, [isLocked, lockoutTimer]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photoUrl' | 'licenseUrl') => {
     const file = e.target.files?.[0];
     if (file) {
+      // Verificação de segurança básica do tipo de ficheiro
+      if (!file.type.startsWith('image/')) {
+        alert('Apenas ficheiros de imagem são permitidos.');
+        return;
+      }
+      // Limite de tamanho (ex: 2MB) para evitar ataques DoS de memória
+      if (file.size > 2 * 1024 * 1024) {
+        alert('A imagem é demasiado grande. Máximo 2MB.');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, [field]: reader.result as string }));
@@ -42,38 +73,82 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const adminEmail = "goquantum32@gmail.com";
-    const adminPass = "nhamposse2004@";
-
-    if (!isRegistering && formData.email === adminEmail && formData.password === adminPass) {
-      onLogin({
-        id: 'adm-root',
-        name: 'Administrador Master',
-        email: adminEmail,
-        phone: '+258 844567470',
-        role: UserRole.ADMIN
-      });
+    // Segurança: Verificar bloqueio
+    if (isLocked) {
+      alert(`Muitas tentativas falhadas. Aguarde ${lockoutTimer} segundos.`);
       return;
     }
 
+    // Segurança: Sanitização dos Inputs
+    const cleanEmail = sanitizeInput(formData.email.trim());
+    const cleanPassword = formData.password; // Senha não sanitizamos para não alterar hash, mas validamos
+    const cleanName = sanitizeInput(formData.name);
+    const cleanPhone = sanitizeInput(formData.phone);
+    const cleanVehicleNumber = sanitizeInput(formData.vehicleNumber);
+
+    const adminEmail = "goquantum32@gmail.com";
+
+    // 1. Verificar Admin (Usando verificação ofuscada)
+    if (!isRegistering && cleanEmail === adminEmail) {
+      if (checkAdminCredentials(cleanPassword)) {
+        onLogin({
+          id: 'adm-root',
+          name: 'Administrador Master',
+          email: adminEmail,
+          phone: '+258 844567470',
+          role: UserRole.ADMIN
+        });
+        setLoginAttempts(0);
+        return;
+      } else {
+        // Falha no login admin
+        handleLoginFailure();
+        return;
+      }
+    }
+
+    // 2. Registo de Novo Utilizador
     if (isRegistering) {
       const newUser: User = {
         id: 'u-' + Date.now(),
-        ...formData,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: cleanPassword, // Em app real, isto seria hash
         role: role,
+        vehicleNumber: cleanVehicleNumber,
+        vehicleColor: sanitizeInput(formData.vehicleColor),
+        vehicleModel: sanitizeInput(formData.vehicleModel),
         availableSeats: role === UserRole.DRIVER ? parseInt(formData.availableSeats) : undefined,
+        photoUrl: formData.photoUrl,
+        licenseUrl: formData.licenseUrl
       };
       onRegister(newUser);
-    } else {
-      const user = users.find(u => u.email === formData.email && u.password === formData.password);
+    } 
+    // 3. Login Normal
+    else {
+      const user = users.find(u => u.email === cleanEmail && u.password === cleanPassword);
       if (user) {
         onLogin(user);
+        setLoginAttempts(0);
       } else {
-        alert('Dados incorretos ou utilizador inexistente.');
+        handleLoginFailure();
       }
+    }
+  };
+
+  const handleLoginFailure = () => {
+    const newAttempts = loginAttempts + 1;
+    setLoginAttempts(newAttempts);
+    if (newAttempts >= 3) {
+      setIsLocked(true);
+      setLockoutTimer(30); // Bloqueia por 30 segundos
+      alert('Muitas tentativas incorretas. O login foi bloqueado por 30 segundos por segurança.');
+    } else {
+      alert(`Dados incorretos. Tentativa ${newAttempts} de 3.`);
     }
   };
 
@@ -90,8 +165,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
           <h2 className="text-4xl font-black text-white tracking-tight">
             {isRegistering ? 'Criar Conta' : 'Aceder'}
           </h2>
-          <p className="text-blue-500 font-bold mt-2 uppercase tracking-widest text-xs">Sistema GoQuantum</p>
+          <div className="flex items-center justify-center gap-2 mt-2">
+             <span className="text-blue-500 font-bold uppercase tracking-widest text-xs">Sistema GoQuantum</span>
+             <span className="bg-green-900/30 text-green-500 text-[8px] px-2 py-0.5 rounded border border-green-900/50 font-black uppercase">Seguro v2.0</span>
+          </div>
         </div>
+
+        {isLocked && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-900/50 rounded-2xl text-center animate-pulse">
+            <p className="text-red-500 font-bold text-sm">Bloqueio de Segurança Ativo</p>
+            <p className="text-gray-400 text-xs mt-1">Tente novamente em {lockoutTimer}s</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="flex bg-gray-950 p-1.5 rounded-2xl mb-6 border border-gray-800">
@@ -109,12 +194,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
                 </div>
               </div>
 
-              <input required type="text" placeholder="Nome Completo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
-              <input required type="tel" placeholder="Telefone (+258)" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={inputClass} />
+              <input required type="text" placeholder="Nome Completo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} maxLength={50} />
+              <input required type="tel" placeholder="Telefone (+258)" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={inputClass} maxLength={15} />
             </div>
           )}
 
-          <input required type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} />
+          <input required type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} maxLength={100} />
 
           {isRegistering && role === UserRole.DRIVER && (
             <div className="space-y-4 pt-4 border-t border-gray-800 animate-in fade-in duration-500">
@@ -134,17 +219,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
                    </div>
                  </div>
                </div>
-               <input required type="text" placeholder="Matrícula" value={formData.vehicleNumber} onChange={e => setFormData({...formData, vehicleNumber: e.target.value})} className={inputClass} />
+               <input required type="text" placeholder="Matrícula" value={formData.vehicleNumber} onChange={e => setFormData({...formData, vehicleNumber: e.target.value})} className={inputClass} maxLength={20} />
                <div className="grid grid-cols-2 gap-3">
-                 <input required type="text" placeholder="Modelo do Carro" value={formData.vehicleModel} onChange={e => setFormData({...formData, vehicleModel: e.target.value})} className={inputClass} />
-                 <input required type="text" placeholder="Cor" value={formData.vehicleColor} onChange={e => setFormData({...formData, vehicleColor: e.target.value})} className={inputClass} />
+                 <input required type="text" placeholder="Modelo do Carro" value={formData.vehicleModel} onChange={e => setFormData({...formData, vehicleModel: e.target.value})} className={inputClass} maxLength={30} />
+                 <input required type="text" placeholder="Cor" value={formData.vehicleColor} onChange={e => setFormData({...formData, vehicleColor: e.target.value})} className={inputClass} maxLength={20} />
                </div>
             </div>
           )}
 
           <input required type="password" placeholder="Palavra-passe" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
 
-          <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-blue-500 transition-all shadow-xl shadow-blue-900/40 mt-6">
+          <button type="submit" disabled={isLocked} className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl mt-6 ${isLocked ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40'}`}>
             {isRegistering ? 'Confirmar Registo' : 'Entrar Agora'}
           </button>
         </form>

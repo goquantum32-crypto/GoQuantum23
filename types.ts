@@ -20,8 +20,9 @@ export interface User {
   photoUrl?: string;
   licenseUrl?: string; 
   isApproved?: boolean;
-  // Novos campos para inteligência de rotas
-  availableDates?: string[]; // Datas em formato YYYY-MM-DD
+  isPriority?: boolean; // Novo campo para motoristas prioritários
+  availableDates?: string[]; 
+  dayRoutes?: Record<string, { start: string, end: string }>; // Rota específica por dia
   routeStart?: string;
   routeEnd?: string;
 }
@@ -36,10 +37,15 @@ export interface TripRequest {
   date: string;
   seats: number;
   price: number;
-  status: 'PENDING' | 'ASSIGNED' | 'PAID' | 'COMPLETED' | 'CANCELLED';
+  status: 'PENDING' | 'ASSIGNED' | 'PAID' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'POSTPONED';
   driverId?: string;
   paymentMethod: 'MPESA' | 'EMOLA';
   paymentConfirmed: boolean;
+  feedback?: {
+    rating: number;
+    comment: string;
+    tags?: string[];
+  };
 }
 
 export type PackageSize = 'SMALL' | 'MEDIUM' | 'LARGE';
@@ -49,12 +55,19 @@ export interface PackageRequest {
   passengerId: string;
   senderName: string;
   senderPhone: string;
+  recipientName: string;
+  recipientPhone: string;
   origin: string;
   destination: string;
   size: PackageSize;
   type: string;
   description: string;
   price: number;
-  status: 'REQUESTED' | 'NEGOTIATING' | 'QUOTED' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED';
+  status: 'REQUESTED' | 'NEGOTIATING' | 'QUOTED' | 'PAYMENT_PENDING' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED' | 'REJECTED';
   driverId?: string;
+  feedback?: {
+    rating: number;
+    comment: string;
+    tags?: string[];
+  };
 }
