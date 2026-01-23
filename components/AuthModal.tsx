@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { sanitizeInput, checkAdminCredentials } from '../utils/security';
-import { auth, googleProvider } from '../services/firebase';
-import { signInWithPopup } from 'firebase/auth';
+import { auth } from '../services/firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -82,9 +81,15 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const handleGoogleLogin = async () => {
     if (isLocked) return;
     setIsLoading(true);
+    console.log("Iniciando processo de login Google...");
+
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      // Cria uma nova instância do provedor para garantir estado limpo
+      const provider = new GoogleAuthProvider();
+      
+      const result = await signInWithPopup(auth, provider);
       const googleUser = result.user;
+      console.log("Login Google realizado:", googleUser.email);
 
       // 1. Verifica se o usuário já existe na nossa base de dados (Realtime DB)
       const existingUser = users.find(u => u.email === googleUser.email);
@@ -109,8 +114,27 @@ const AuthModal: React.FC<AuthModalProps> = ({
         await onRegister(newUser);
       }
     } catch (error: any) {
-      console.error("Erro no Login Google:", error);
-      alert("Erro ao entrar com Google: " + error.message);
+      console.error("Erro detalhado Google:", error);
+      
+      let errorMsg = "Erro ao conectar com Google.";
+      
+      // Tratamento de erros comuns do Firebase Auth
+      if (error.code === 'auth/popup-blocked') {
+        errorMsg = "O seu navegador bloqueou o popup do Google. Por favor, permita popups para este site.";
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorMsg = "O login foi cancelado (janela fechada).";
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMsg = "Operação cancelada.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMsg = "O Login com Google não está ativado no Firebase Console. Contacte o administrador.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        const currentDomain = window.location.hostname;
+        errorMsg = `DOMÍNIO NÃO AUTORIZADO (${currentDomain}).\n\n1. Vá ao Firebase Console\n2. Menu Authentication > Settings > Authorized Domains\n3. Adicione este domínio: ${currentDomain}`;
+      } else {
+        errorMsg = error.message;
+      }
+
+      alert(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -238,7 +262,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
             type="button"
             onClick={handleGoogleLogin}
             disabled={isLocked || isLoading}
-            className="w-full bg-white text-gray-900 hover:bg-gray-100 py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all shadow-lg"
+            className="w-full bg-white text-gray-900 hover:bg-gray-100 py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all shadow-lg cursor-pointer"
           >
             {isLoading ? (
                <span className="animate-pulse">A Conectar...</span>
