@@ -9,9 +9,14 @@ interface AuthModalProps {
   onLogin: (user: User) => void;
   onRegister: (user: User) => void;
   users: User[];
+  initialMode?: 'LOGIN' | 'REGISTER';
+  initialRole?: UserRole;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegister, users }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ 
+  isOpen, onClose, onLogin, onRegister, users, 
+  initialMode = 'LOGIN', initialRole = UserRole.PASSENGER 
+}) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [role, setRole] = useState<UserRole>(UserRole.PASSENGER);
   const [formData, setFormData] = useState({
@@ -27,13 +32,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
 
   useEffect(() => {
     if (isOpen) {
+      // Reset form
       setFormData({
         name: '', email: '', phone: '', password: '', 
         vehicleNumber: '', vehicleColor: '', vehicleModel: '', availableSeats: '15',
         photoUrl: '', licenseUrl: ''
       });
+      // Set initial mode
+      setIsRegistering(initialMode === 'REGISTER');
+      setRole(initialRole);
     }
-  }, [isOpen]);
+  }, [isOpen, initialMode, initialRole]);
 
   // Efeito para gerir o temporizador de bloqueio
   useEffect(() => {

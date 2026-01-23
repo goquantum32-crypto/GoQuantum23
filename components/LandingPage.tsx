@@ -1,8 +1,9 @@
 
 import React from 'react';
+import { UserRole } from '../types';
 
 interface LandingPageProps {
-  onAction: () => void;
+  onAction: (mode: 'LOGIN' | 'REGISTER', role?: UserRole) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onAction }) => {
@@ -22,7 +23,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAction }) => {
           </div>
           <h3 className="text-2xl font-bold mb-4">Passageiros</h3>
           <p className="mb-6 text-gray-600">Reserve o seu lugar nas melhores rotas interprovinciais.</p>
-          <button onClick={onAction} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Reservar Agora</button>
+          <button onClick={() => onAction('REGISTER', UserRole.PASSENGER)} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Reservar Agora</button>
         </div>
 
         <div className="glass-card p-8 rounded-2xl text-gray-800 hover:transform hover:-translate-y-2 transition-all duration-300">
@@ -31,7 +32,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAction }) => {
           </div>
           <h3 className="text-2xl font-bold mb-4">Encomendas</h3>
           <p className="mb-6 text-gray-600">Envie cargas e encomendas para qualquer ponto da rota.</p>
-          <button onClick={onAction} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700">Enviar Encomenda</button>
+          <button onClick={() => onAction('REGISTER', UserRole.PASSENGER)} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700">Enviar Encomenda</button>
         </div>
 
         <div className="glass-card p-8 rounded-2xl text-gray-800 hover:transform hover:-translate-y-2 transition-all duration-300">
@@ -40,7 +41,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onAction }) => {
           </div>
           <h3 className="text-2xl font-bold mb-4">Motoristas</h3>
           <p className="mb-6 text-gray-600">Seja um parceiro GoQuantum e rentabilize as suas viagens.</p>
-          <button onClick={onAction} className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700">Trabalhar Conosco</button>
+          <button onClick={() => onAction('REGISTER', UserRole.DRIVER)} className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700">Trabalhar Conosco</button>
         </div>
       </div>
     </div>

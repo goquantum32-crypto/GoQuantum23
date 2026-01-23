@@ -15,7 +15,12 @@ const App: React.FC = () => {
   const [trips, setTrips] = useState<TripRequest[]>([]);
   const [packages, setPackages] = useState<PackageRequest[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  
+  // Auth State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.PASSENGER);
+
   const [view, setView] = useState<'LANDING' | 'PASSENGER' | 'DRIVER' | 'ADMIN'>('LANDING');
 
   // 1. Sincronização em Tempo Real (Leitura)
@@ -79,7 +84,10 @@ const App: React.FC = () => {
       .then(() => {
         handleLogin(newUser);
       })
-      .catch((error) => console.error("Erro ao registar:", error));
+      .catch((error) => {
+        console.error("Erro ao registar:", error);
+        alert(`Erro ao criar conta: ${error.message}. Verifique a sua conexão ou tente novamente.`);
+      });
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -106,7 +114,13 @@ const App: React.FC = () => {
     update(ref(db, `packages/${updatedPkg.id}`), updatedPkg);
   };
 
-  // Fluxo de Autenticação Local
+  // Fluxo de Autenticação
+  const handleOpenAuth = (mode: 'LOGIN' | 'REGISTER', role: UserRole = UserRole.PASSENGER) => {
+    setAuthInitialMode(mode);
+    setAuthInitialRole(role);
+    setIsAuthModalOpen(true);
+  };
+
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
@@ -126,13 +140,13 @@ const App: React.FC = () => {
     <div className={`min-h-screen transition-colors duration-500 ${view === 'LANDING' ? 'quantum-bg' : 'bg-gray-950 text-gray-100'}`}>
       <Navbar 
         user={currentUser} 
-        onLoginClick={() => setIsAuthModalOpen(true)} 
+        onLoginClick={() => handleOpenAuth('LOGIN')} 
         onLogout={handleLogout}
         onViewChange={setView}
       />
 
       <main className="container mx-auto px-4 py-8">
-        {view === 'LANDING' && <LandingPage onAction={() => setIsAuthModalOpen(true)} />}
+        {view === 'LANDING' && <LandingPage onAction={handleOpenAuth} />}
         
         {view === 'PASSENGER' && currentUser?.role === UserRole.PASSENGER && (
           <PassengerArea 
@@ -176,6 +190,8 @@ const App: React.FC = () => {
         onLogin={handleLogin}
         users={users} // Lista sincronizada do Firebase para verificar login
         onRegister={handleRegisterUser}
+        initialMode={authInitialMode}
+        initialRole={authInitialRole}
       />
     </div>
   );
