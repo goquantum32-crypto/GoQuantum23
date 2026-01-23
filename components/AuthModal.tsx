@@ -1,8 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { sanitizeInput, checkAdminCredentials } from '../utils/security';
-import { auth } from '../services/firebase';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -75,68 +74,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
         setFormData(prev => ({ ...prev, [field]: reader.result as string }));
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    if (isLocked) return;
-    setIsLoading(true);
-    console.log("Iniciando processo de login Google...");
-
-    try {
-      // Cria uma nova instância do provedor para garantir estado limpo
-      const provider = new GoogleAuthProvider();
-      
-      const result = await signInWithPopup(auth, provider);
-      const googleUser = result.user;
-      console.log("Login Google realizado:", googleUser.email);
-
-      // 1. Verifica se o usuário já existe na nossa base de dados (Realtime DB)
-      const existingUser = users.find(u => u.email === googleUser.email);
-
-      if (existingUser) {
-        // Login direto se já existe
-        onLogin(existingUser);
-        setLoginAttempts(0);
-      } else {
-        // 2. Se não existe, cria um novo registo automático
-        const newUser: User = {
-          id: googleUser.uid, // Usa o UID do Firebase Auth
-          name: googleUser.displayName || 'Utilizador Google',
-          email: googleUser.email || '',
-          phone: googleUser.phoneNumber || '', // Google nem sempre retorna telefone
-          role: UserRole.PASSENGER, // Google Login padrão para Passageiro
-          photoUrl: googleUser.photoURL || '',
-          password: 'google-auth-secured', // Placeholder seguro
-        };
-        
-        // Regista na base de dados (App.tsx vai salvar no Firebase)
-        await onRegister(newUser);
-      }
-    } catch (error: any) {
-      console.error("Erro detalhado Google:", error);
-      
-      let errorMsg = "Erro ao conectar com Google.";
-      
-      // Tratamento de erros comuns do Firebase Auth
-      if (error.code === 'auth/popup-blocked') {
-        errorMsg = "O seu navegador bloqueou o popup do Google. Por favor, permita popups para este site.";
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        errorMsg = "O login foi cancelado (janela fechada).";
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        errorMsg = "Operação cancelada.";
-      } else if (error.code === 'auth/operation-not-allowed') {
-        errorMsg = "O Login com Google não está ativado no Firebase Console. Contacte o administrador.";
-      } else if (error.code === 'auth/unauthorized-domain') {
-        const currentDomain = window.location.hostname;
-        errorMsg = `DOMÍNIO NÃO AUTORIZADO (${currentDomain}).\n\n1. Vá ao Firebase Console\n2. Menu Authentication > Settings > Authorized Domains\n3. Adicione este domínio: ${currentDomain}`;
-      } else {
-        errorMsg = error.message;
-      }
-
-      alert(errorMsg);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -255,34 +192,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
           <div className="flex bg-gray-950 p-1.5 rounded-2xl mb-2 border border-gray-800">
             <button type="button" onClick={() => setIsRegistering(false)} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${!isRegistering ? 'bg-gray-800 shadow-md text-blue-400' : 'text-gray-500'}`}>Login</button>
             <button type="button" onClick={() => setIsRegistering(true)} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isRegistering ? 'bg-gray-800 shadow-md text-blue-400' : 'text-gray-500'}`}>Registo</button>
-          </div>
-
-          {/* GOOGLE SIGN IN BUTTON */}
-          <button 
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={isLocked || isLoading}
-            className="w-full bg-white text-gray-900 hover:bg-gray-100 py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all shadow-lg cursor-pointer"
-          >
-            {isLoading ? (
-               <span className="animate-pulse">A Conectar...</span>
-            ) : (
-               <>
-                 <svg className="w-5 h-5" viewBox="0 0 24 24">
-                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                 </svg>
-                 Entrar com Google
-               </>
-            )}
-          </button>
-
-          <div className="flex items-center gap-4 py-2">
-             <div className="h-px bg-gray-800 flex-1"></div>
-             <span className="text-gray-600 text-[10px] font-black uppercase tracking-widest">OU EMAIL</span>
-             <div className="h-px bg-gray-800 flex-1"></div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

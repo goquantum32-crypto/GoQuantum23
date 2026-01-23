@@ -43,7 +43,7 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
   });
 
   const [tripForm, setTripForm] = useState({ 
-    origin: '', destination: '', date: '', seats: 1, paymentMethod: 'MPESA' as 'MPESA' | 'EMOLA' 
+    origin: '', destination: '', date: '', time: '', seats: 1, paymentMethod: 'MPESA' as 'MPESA' | 'EMOLA' 
   });
 
   const [pkgForm, setPkgForm] = useState({ 
@@ -59,6 +59,10 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
 
   const handleTripSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tripForm.time) {
+      alert('Por favor, selecione um horário de partida.');
+      return;
+    }
     const newTrip: TripRequest = {
       id: 'GQ-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
       passengerId: user.id,
@@ -185,9 +189,19 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
                     {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <input required type="date" value={tripForm.date} onChange={e => setTripForm({...tripForm, date: e.target.value})} className={inputClass} />
-                  <input required type="number" min="1" value={tripForm.seats} onChange={e => setTripForm({...tripForm, seats: parseInt(e.target.value)})} className={inputClass} placeholder="Lugares" />
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-1">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Data</label>
+                     <input required type="date" value={tripForm.date} onChange={e => setTripForm({...tripForm, date: e.target.value})} className={inputClass} />
+                  </div>
+                  <div className="col-span-1">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Horário</label>
+                     <input required type="time" value={tripForm.time} onChange={e => setTripForm({...tripForm, time: e.target.value})} className={inputClass} />
+                  </div>
+                  <div className="col-span-1">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block tracking-widest">Lugares</label>
+                     <input required type="number" min="1" value={tripForm.seats} onChange={e => setTripForm({...tripForm, seats: parseInt(e.target.value)})} className={inputClass} placeholder="Lugares" />
+                  </div>
                 </div>
                 
                 <div className="bg-gray-950 p-6 rounded-3xl border border-gray-800">
@@ -228,7 +242,7 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
                        <div>
                          <span className="text-[10px] font-black text-blue-500 bg-blue-900/20 px-2 py-0.5 rounded mb-2 inline-block">COD: {t.id}</span>
                          <h4 className="text-xl font-black text-white">{t.origin} ➜ {t.destination}</h4>
-                         <p className="text-xs text-gray-500 font-bold">{t.date} • {t.seats} Lugares</p>
+                         <p className="text-xs text-gray-500 font-bold">{t.date} às <span className="text-blue-400">{t.time || 'N/A'}</span> • {t.seats} Lugares</p>
                        </div>
                        <div className="text-right">
                           <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border transition-all ${t.status === 'COMPLETED' ? 'bg-gray-800 text-gray-500 border-gray-700' : (t.status === 'CANCELLED' ? 'bg-red-900/20 text-red-500 border-red-900' : 'bg-blue-900/20 text-blue-400 border-blue-800 animate-pulse')}`}>{t.status === 'POSTPONED' ? 'ADIADO' : t.status}</span>
@@ -267,48 +281,36 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
                                     </div>
                                  </div>
                               </div>
-                              <div className="space-y-6">
+                              <div className="space-y-6 md:text-right">
                                  <div>
-                                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Viatura Detalhes</p>
-                                    <p className="text-lg font-black text-white">{driver.vehicleModel}</p>
-                                    <p className="text-sm font-bold text-blue-400 mt-1">{driver.vehicleColor} • {driver.vehicleNumber}</p>
+                                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Viatura</p>
+                                    <p className="text-lg font-black text-white">{driver.vehicleModel} - {driver.vehicleColor}</p>
+                                    <p className="text-sm text-gray-400 font-black">{driver.vehicleNumber}</p>
                                  </div>
                                  <div>
-                                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Trajeto</p>
-                                    <p className="text-lg font-black text-white">{t.origin} ➜ <span className="text-blue-500">{t.destination}</span></p>
+                                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1">Partida</p>
+                                    <p className="text-2xl font-black text-blue-400">{t.time}</p>
                                  </div>
                               </div>
                            </div>
                         </div>
 
-                        {/* Botões de Ação da Viagem */}
-                        <div className="flex flex-col gap-4">
-                           {/* 1. Botões de Gestão (Adiar/Cancelar) - Apenas antes de iniciar */}
-                           {canManageTrip && (
-                              <div className="flex gap-4">
-                                 <button onClick={() => handlePostponeTrip(t)} className="flex-1 bg-gray-950 border border-gray-800 text-yellow-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all">Adiar Viagem</button>
-                                 <button onClick={() => handleCancelTrip(t)} className="flex-1 bg-red-900/10 text-red-500 border border-red-900/20 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-900/20 transition-all">Cancelar</button>
-                              </div>
-                           )}
-
-                           {/* 2. Botão Principal de Fluxo (Iniciar -> Terminar) */}
-                           {t.status === 'PAID' || t.status === 'ASSIGNED' ? (
-                              <button onClick={() => onUpdateTrip({...t, status: 'IN_PROGRESS'})} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/20 hover:scale-[1.02] transition-all">
-                                 Iniciar Minha Viagem
-                              </button>
-                           ) : t.status === 'IN_PROGRESS' ? (
-                              <button onClick={() => { onUpdateTrip({...t, status: 'COMPLETED'}); setFeedbackTarget({id: t.id, type: 'TRIP'}); }} className="w-full bg-green-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-green-900/20 hover:scale-[1.02] transition-all animate-pulse">
-                                 Terminar Viagem (Cheguei!)
-                              </button>
-                           ) : null}
-                        </div>
+                        {/* Área de Feedback */}
+                        {t.status === 'COMPLETED' && !t.feedback && (
+                           <div className="text-center bg-gray-900 p-6 rounded-3xl border border-gray-800">
+                              <p className="text-sm font-bold text-white mb-4">Como foi a sua viagem?</p>
+                              <button onClick={() => setFeedbackTarget({id: t.id, type: 'TRIP'})} className="bg-white text-gray-900 px-6 py-2 rounded-xl font-black text-xs uppercase hover:bg-gray-200">Avaliar Motorista</button>
+                           </div>
+                        )}
+                        
+                        {/* Ações de Cancelamento */}
+                        {['ASSIGNED', 'PAID'].includes(t.status) && (
+                           <div className="flex justify-center gap-4">
+                              <button onClick={() => handlePostponeTrip(t)} className="text-orange-500 text-[10px] font-black uppercase hover:underline">Adiar Viagem</button>
+                              <button onClick={() => handleCancelTrip(t)} className="text-red-500 text-[10px] font-black uppercase hover:underline">Cancelar Viagem</button>
+                           </div>
+                        )}
                       </div>
-                    )}
-
-                    {(t.status === 'CANCELLED' || t.status === 'POSTPONED') && (
-                       <div className="p-8 text-center">
-                          <p className="text-gray-500 text-sm">Esta viagem foi {t.status === 'CANCELLED' ? 'cancelada' : 'adiada'}. Contacte o suporte se precisar de ajuda.</p>
-                       </div>
                     )}
                   </div>
                 );
@@ -317,36 +319,21 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
           </div>
 
           <div className="lg:col-span-5 space-y-8">
-             <div className="sticky top-24 bg-gray-900 p-8 rounded-[3rem] border border-gray-800 shadow-xl space-y-8">
-                <h4 className="text-xl font-black text-white border-b border-gray-800 pb-4">Central de Apoio</h4>
-                <div className="space-y-6">
-                   <div className="space-y-3">
-                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Contas de Depósito</p>
-                      <div className="bg-gray-950 p-6 rounded-3xl border border-gray-800 space-y-4">
-                         <div className="flex justify-between items-center border-b border-gray-900 pb-3">
-                            <span className="text-xs font-bold text-gray-400">M-Pesa:</span>
-                            <span className="text-sm font-black text-white">844567470</span>
-                         </div>
-                         <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-gray-400">e-Mola:</span>
-                            <span className="text-sm font-black text-white">860675792</span>
-                         </div>
-                         <p className="text-[9px] text-gray-600 text-center font-black uppercase mt-2">Titular: Estevão Sitefane</p>
-                      </div>
+             <div className="bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-xl sticky top-24">
+                <h4 className="text-xl font-black text-white mb-6">Informações Úteis</h4>
+                <div className="space-y-4">
+                   <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800">
+                      <p className="text-blue-500 font-black text-xs uppercase mb-1">Pagamentos</p>
+                      <p className="text-gray-400 text-xs">Os pagamentos devem ser feitos via M-PESA ou e-MOLA imediatamente após a reserva para garantir o seu lugar.</p>
                    </div>
-
-                   <div className="bg-gray-950 p-6 rounded-3xl border border-gray-800">
-                      <p className="text-xs font-bold text-gray-400 mb-2">Validação de Pagamento</p>
-                      <p className="text-[10px] text-gray-600 leading-relaxed italic">O sistema GoQuantum valida os pagamentos em até 30 minutos após o envio do comprovativo. Fique atento às notificações!</p>
+                   <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800">
+                      <p className="text-green-500 font-black text-xs uppercase mb-1">Bagagem</p>
+                      <p className="text-gray-400 text-xs">Cada passageiro tem direito a uma mala média. Cargas extra devem ser registadas como "Encomendas".</p>
                    </div>
-                   
-                   <a href="tel:844567470" className="flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.5rem] font-black group hover:bg-blue-500 transition-all shadow-xl shadow-blue-900/20">
-                      <div>
-                         <p className="text-[8px] opacity-70 uppercase tracking-widest">Dúvidas?</p>
-                         <span className="text-sm uppercase">Fale com o Admin</span>
-                      </div>
-                      <span className="text-xl">📞</span>
-                   </a>
+                   <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800">
+                      <p className="text-orange-500 font-black text-xs uppercase mb-1">Pontualidade</p>
+                      <p className="text-gray-400 text-xs">Esteja no local de embarque 15 minutos antes da hora marcada. Os motoristas não aguardam mais de 10 min.</p>
+                   </div>
                 </div>
              </div>
           </div>
@@ -354,208 +341,154 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
       )}
 
       {activeTab === 'PACKAGES' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in slide-in-from-bottom-4">
-           <div className="bg-gray-900 p-10 rounded-[2.5rem] border border-gray-800 shadow-xl">
-              <h3 className="text-2xl font-black text-white mb-8">Novo Pedido de Encomenda</h3>
-              <form onSubmit={(e) => { e.preventDefault(); onSubmitPackage({id: 'PKG-'+Math.random().toString(36).substr(2,6).toUpperCase(), passengerId: user.id, senderName: user.name, senderPhone: user.phone, ...pkgForm, price: 0, status: 'REQUESTED'}); alert('Pedido de carga enviado com sucesso! O Admin entrará em contato com a cotação.'); }} className="space-y-6">
-                 <div className="grid grid-cols-2 gap-4">
-                   <input required placeholder="Nome do Destinatário" value={pkgForm.recipientName} onChange={e => setPkgForm({...pkgForm, recipientName: e.target.value})} className={inputClass} />
-                   <input required type="tel" placeholder="Telefone (+258)" value={pkgForm.recipientPhone} onChange={e => setPkgForm({...pkgForm, recipientPhone: e.target.value})} className={inputClass} />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <select required value={pkgForm.origin} onChange={e => setPkgForm({...pkgForm, origin: e.target.value})} className={inputClass}>
-                      <option value="">Origem</option>
-                      {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <select required value={pkgForm.destination} onChange={e => setPkgForm({...pkgForm, destination: e.target.value})} className={inputClass}>
-                      <option value="">Destino</option>
-                      {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                 </div>
-                 <textarea required placeholder="Descreva os itens da carga (peso estimado, tipo de mercadoria...)" value={pkgForm.description} onChange={e => setPkgForm({...pkgForm, description: e.target.value})} className={inputClass + " h-32"} />
-                 <button type="submit" className="w-full bg-green-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-green-500 transition-all shadow-xl shadow-green-900/20">Solicitar Cotação de Carga</button>
-              </form>
-           </div>
-
-           <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white px-2">Cargas em Logística</h3>
-              {packages.length === 0 && <p className="text-gray-600 italic py-20 text-center bg-gray-900 rounded-[2.5rem] border border-gray-800 border-dashed">Sem encomendas registadas.</p>}
-              {packages.map(p => {
-                const driver = users.find(u => u.id === p.driverId);
-                return (
-                  <div key={p.id} className="bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 space-y-6">
-                    <div className="flex justify-between items-start">
-                       <div>
-                          <p className="text-white font-black text-lg">{p.origin} ➜ {p.destination}</p>
-                          <p className="text-xs text-gray-500 font-bold">Recetor: {p.recipientName}</p>
-                       </div>
-                       <span className="text-[10px] font-black text-blue-500 uppercase bg-blue-900/20 px-3 py-1 rounded-lg">{p.status === 'PAYMENT_PENDING' ? 'A VALIDAR' : p.status}</span>
-                    </div>
-
-                    {p.status === 'QUOTED' && (
-                      <div className="bg-blue-900/10 p-6 rounded-3xl border border-blue-800/30 text-center space-y-4">
-                        <p className="text-white font-black text-xl">Preço: {p.price.toLocaleString()} MZN</p>
-                        <div className="flex gap-4">
-                           <button onClick={() => onUpdatePackage({...p, status: 'PAYMENT_PENDING'})} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg">Aceitar & Pagar</button>
-                           <button onClick={() => onUpdatePackage({...p, status: 'REJECTED'})} className="flex-1 bg-red-900/20 text-red-500 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-900/30 transition-all border border-red-900/30">Recusar</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {p.status === 'PAYMENT_PENDING' && (
-                      <div className="p-8 bg-blue-900/10 border-t border-blue-900/20 text-center space-y-4 rounded-3xl">
-                         <div className="bg-blue-900/20 p-4 rounded-2xl inline-block mb-2">
-                           <p className="text-blue-400 font-black text-sm">📲 TIRE SCREENSHOT DO PAGAMENTO!</p>
-                         </div>
-                         <p className="text-white font-black text-lg">Valor: {p.price.toLocaleString()} MZN</p>
-                         <p className="text-gray-400 text-xs leading-relaxed max-w-sm mx-auto">Envie o comprovativo para o WhatsApp do Admin indicando o código <b>{p.id}</b> para libertar a carga.</p>
-                         <div className="grid grid-cols-2 gap-2 text-xs text-gray-400 my-2">
-                            <span>M-PESA: 844567470</span>
-                            <span>e-MOLA: 860675792</span>
-                         </div>
-                         <a href={`https://wa.me/258844567470?text=Olá, aqui está o comprovativo da encomenda ID: ${p.id}. Valor: ${p.price} MZN`} target="_blank" className="inline-block bg-green-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-green-500 transition-all shadow-lg shadow-green-900/20">Enviar via WhatsApp</a>
-                      </div>
-                    )}
-
-                    {p.status === 'PAID' && driver && (
-                      <div className="bg-gray-950 p-6 rounded-3xl border border-gray-800 space-y-4 shadow-inner">
-                         <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Viatura em Transporte</p>
-                         <div className="flex justify-between items-center">
-                            <p className="text-white font-bold">{driver.name}</p>
-                            <a href={`tel:${driver.phone}`} className="text-blue-500 font-black underline text-xs">Ligar</a>
-                         </div>
-                         <p className="text-[11px] text-gray-400 font-medium">{driver.vehicleModel} • {driver.vehicleColor} • {driver.vehicleNumber}</p>
-                         
-                         <button onClick={() => onUpdatePackage({...p, status: 'IN_TRANSIT'})} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-500 transition-all shadow-lg mt-4">Entregar Carga ao Motorista</button>
-                      </div>
-                    )}
-
-                    {p.status === 'IN_TRANSIT' && (
-                       <div className="bg-blue-900/10 p-6 rounded-3xl border border-blue-800/30 space-y-4">
-                          <p className="text-blue-400 text-center font-black text-sm uppercase animate-pulse">Carga em Movimento</p>
-                          <button onClick={() => { onUpdatePackage({...p, status: 'DELIVERED'}); setFeedbackTarget({id: p.id, type: 'PACKAGE'}); }} className="w-full bg-green-600 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-500 transition-all shadow-lg">Confirmar Receção no Destino</button>
-                       </div>
-                    )}
-
-                    {p.status === 'DELIVERED' && (
-                       <div className="bg-gray-950 p-6 rounded-3xl border border-gray-800 text-center">
-                          <p className="text-green-500 font-black text-sm uppercase mb-2">Entregue com Sucesso</p>
-                          {p.feedback ? (
-                             <div className="space-y-2">
-                                <div className="text-yellow-500 text-xl">{'★'.repeat(p.feedback.rating)}</div>
-                                <div className="flex flex-wrap justify-center gap-2">
-                                    {p.feedback.tags?.map(t => (
-                                        <span key={t} className="px-2 py-1 bg-gray-900 border border-gray-800 rounded text-[9px] text-gray-400">{t}</span>
-                                    ))}
-                                </div>
-                             </div>
-                          ) : (
-                             <button onClick={() => setFeedbackTarget({id: p.id, type: 'PACKAGE'})} className="text-xs text-gray-500 underline font-bold hover:text-white">Deixar Avaliação</button>
-                          )}
-                       </div>
-                    )}
-                  </div>
-                )
-              })}
-           </div>
-        </div>
-      )}
-
-      {/* --- ABA DE PERFIL (ADICIONADA) --- */}
-      {activeTab === 'PROFILE' && (
-        <div className="max-w-2xl mx-auto bg-gray-900 p-10 rounded-[2.5rem] border border-gray-800 shadow-xl space-y-8 animate-in slide-in-from-bottom-4">
-           <h3 className="text-2xl font-black text-white text-center">Meu Perfil</h3>
+        <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4">
+           <h3 className="text-2xl font-black text-white mb-8">Enviar Encomenda</h3>
            
-           <div className="flex flex-col items-center space-y-4">
-              <div className="relative group">
-                 <img src={profileForm.photoUrl || 'https://via.placeholder.com/150'} className="w-32 h-32 rounded-full object-cover border-4 border-gray-800 shadow-2xl" />
-                 <label className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full cursor-pointer hover:bg-blue-500 transition-all shadow-lg group-hover:scale-110">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoUpdate} />
-                 </label>
-              </div>
-              <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Toque no ícone para alterar a foto</p>
-           </div>
+           <form onSubmit={(e) => {
+             e.preventDefault();
+             onSubmitPackage({
+               id: 'PKG-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+               passengerId: user.id,
+               senderName: user.name,
+               senderPhone: user.phone,
+               ...pkgForm,
+               price: 0, 
+               status: 'REQUESTED'
+             });
+             alert('Pedido de cotação enviado! Aguarde a resposta do Admin.');
+           }} className="space-y-6">
+             <div className="grid grid-cols-2 gap-4">
+                <select required value={pkgForm.origin} onChange={e => setPkgForm({...pkgForm, origin: e.target.value})} className={inputClass}>
+                  <option value="">Origem</option>
+                  {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <select required value={pkgForm.destination} onChange={e => setPkgForm({...pkgForm, destination: e.target.value})} className={inputClass}>
+                  <option value="">Destino</option>
+                  {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+             </div>
+             
+             <div className="grid grid-cols-2 gap-4">
+                <input required type="text" placeholder="Nome do Destinatário" value={pkgForm.recipientName} onChange={e => setPkgForm({...pkgForm, recipientName: e.target.value})} className={inputClass} />
+                <input required type="tel" placeholder="Telefone do Destinatário" value={pkgForm.recipientPhone} onChange={e => setPkgForm({...pkgForm, recipientPhone: e.target.value})} className={inputClass} />
+             </div>
 
-           <form onSubmit={handleSaveProfile} className="space-y-6">
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Nome Completo</label>
-                 <input 
-                    type="text" 
-                    value={profileForm.name} 
-                    onChange={e => setProfileForm({...profileForm, name: e.target.value})} 
-                    className={inputClass} 
-                 />
-              </div>
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Telefone</label>
-                 <input 
-                    type="tel" 
-                    value={profileForm.phone} 
-                    onChange={e => setProfileForm({...profileForm, phone: e.target.value})} 
-                    className={inputClass} 
-                 />
-              </div>
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Email</label>
-                 <input 
-                    type="email" 
-                    value={profileForm.email} 
-                    onChange={e => setProfileForm({...profileForm, email: e.target.value})} 
-                    className={inputClass} 
-                 />
-              </div>
-              
-              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 hover:bg-blue-500 transition-all">
-                 Salvar Alterações
-              </button>
+             <div className="grid grid-cols-2 gap-4">
+                <select required value={pkgForm.size} onChange={e => setPkgForm({...pkgForm, size: e.target.value as PackageSize})} className={inputClass}>
+                   <option value="SMALL">Pequena (ex: Envelope)</option>
+                   <option value="MEDIUM">Média (ex: Caixa Sapatos)</option>
+                   <option value="LARGE">Grande (ex: Mala)</option>
+                </select>
+                <input required type="text" placeholder="Tipo (ex: Eletrónicos, Roupa)" value={pkgForm.type} onChange={e => setPkgForm({...pkgForm, type: e.target.value})} className={inputClass} />
+             </div>
+
+             <textarea required placeholder="Descrição detalhada da carga..." value={pkgForm.description} onChange={e => setPkgForm({...pkgForm, description: e.target.value})} className={`${inputClass} h-32 resize-none`} />
+
+             <button type="submit" className="w-full bg-blue-600 py-5 rounded-2xl text-white font-black text-lg shadow-xl shadow-blue-900/20 hover:bg-blue-500 transition-all">Solicitar Cotação</button>
            </form>
+
+           <div className="mt-12 space-y-6">
+             <h4 className="text-xl font-black text-white">Minhas Encomendas</h4>
+             {packages.map(p => (
+               <div key={p.id} className="bg-gray-950 p-6 rounded-[2rem] border border-gray-800">
+                  <div className="flex justify-between items-start mb-4">
+                     <div>
+                        <span className="text-[10px] font-black text-blue-500 bg-blue-900/20 px-2 py-0.5 rounded uppercase">REF: {p.id}</span>
+                        <h5 className="text-white font-bold mt-1">{p.origin} ➜ {p.destination}</h5>
+                     </div>
+                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${p.status === 'REQUESTED' ? 'bg-yellow-900/20 text-yellow-500' : (p.status === 'QUOTED' ? 'bg-blue-900/20 text-blue-400' : 'bg-green-900/20 text-green-500')}`}>{p.status}</span>
+                  </div>
+                  
+                  {p.status === 'QUOTED' && (
+                     <div className="bg-blue-900/10 border border-blue-900/30 p-4 rounded-xl text-center">
+                        <p className="text-gray-400 text-xs mb-1">Cotação Recebida:</p>
+                        <p className="text-2xl font-black text-white">{p.price} MZN</p>
+                        <p className="text-[10px] text-gray-500 mb-3">Motorista disponível para transporte</p>
+                        <button 
+                           onClick={() => onUpdatePackage({ ...p, status: 'PAYMENT_PENDING' })}
+                           className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-xs uppercase hover:bg-blue-500 w-full"
+                        >
+                           Aceitar & Pagar
+                        </button>
+                     </div>
+                  )}
+
+                  {p.status === 'PAYMENT_PENDING' && (
+                     <div className="text-center mt-4">
+                        <p className="text-xs text-yellow-500 font-bold animate-pulse">Aguardando Pagamento ({p.price} MZN)</p>
+                        <p className="text-[10px] text-gray-600">Envie o comprovativo para o Admin.</p>
+                     </div>
+                  )}
+               </div>
+             ))}
+             {packages.length === 0 && <p className="text-gray-600 italic text-center">Sem registos.</p>}
+           </div>
         </div>
       )}
 
-      {/* Modal Feedback Estilo Yango */}
+      {activeTab === 'PROFILE' && (
+         <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4">
+            <h3 className="text-2xl font-black text-white mb-8">Editar Perfil</h3>
+            <form onSubmit={handleSaveProfile} className="space-y-6">
+               <div className="flex justify-center mb-6">
+                  <div className="relative group w-32 h-32">
+                     <img src={profileForm.photoUrl || 'https://via.placeholder.com/150'} className="w-full h-full rounded-full object-cover border-4 border-gray-800 group-hover:border-blue-500 transition-all" />
+                     <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
+                        <span className="text-xs font-bold text-white">Alterar</span>
+                        <input type="file" accept="image/*" onChange={handleProfilePhotoUpdate} className="absolute inset-0 opacity-0 cursor-pointer" />
+                     </div>
+                  </div>
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Nome</label>
+                     <input type="text" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className={inputClass} />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Telefone</label>
+                     <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className={inputClass} />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Email</label>
+                     <input type="email" value={profileForm.email} disabled className={`${inputClass} opacity-50 cursor-not-allowed`} />
+                  </div>
+               </div>
+               <button type="submit" className="w-full bg-gray-800 text-white py-4 rounded-2xl font-black text-sm uppercase hover:bg-gray-700 transition-all">Guardar Alterações</button>
+            </form>
+         </div>
+      )}
+
+      {/* Modal de Feedback */}
       {feedbackTarget && (
-        <div className="fixed inset-0 z-[150] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-           <div className="bg-gray-900 p-8 rounded-[3rem] border border-gray-800 w-full max-w-lg text-center space-y-6 shadow-2xl animate-in zoom-in-95 duration-300">
-              <h3 className="text-2xl font-black text-white">Avalie a Experiência</h3>
-              <p className="text-gray-500 text-xs uppercase tracking-widest">O que achou do serviço?</p>
-              
-              {/* Estrelas */}
-              <div className="flex justify-center space-x-3 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+           <div className="bg-gray-900 p-8 rounded-[2.5rem] w-full max-w-md border border-gray-800">
+              <h4 className="text-xl font-black text-center text-white mb-6">Avaliar Experiência</h4>
+              <div className="flex justify-center space-x-2 mb-6">
                  {[1,2,3,4,5].map(star => (
-                   <button 
-                     key={star} 
-                     onClick={() => setFeedbackData({...feedbackData, rating: star, tags: []})} // Reset tags on rating change
-                     className={`text-4xl transition-all duration-200 hover:scale-110 ${feedbackData.rating >= star ? 'text-yellow-500 drop-shadow-[0_0_10px_rgba(234,179,8,0.4)]' : 'text-gray-800'}`}
-                   >
-                     ★
-                   </button>
+                    <button key={star} onClick={() => setFeedbackData({...feedbackData, rating: star})} className={`text-3xl transition-transform hover:scale-125 ${star <= feedbackData.rating ? 'text-yellow-500' : 'text-gray-700'}`}>★</button>
                  ))}
               </div>
-
-              {/* Etiquetas Selecionáveis (Chips) */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="flex flex-wrap justify-center gap-2 mb-6">
                  {currentTags.map(tag => (
-                    <button
-                        key={tag}
-                        onClick={() => toggleTag(tag)}
-                        className={`py-2 px-1 rounded-xl text-[10px] font-bold border transition-all truncate ${feedbackData.tags.includes(tag) ? 'bg-white text-black border-white' : 'bg-gray-950 text-gray-400 border-gray-800 hover:border-gray-600'}`}
+                    <button 
+                       key={tag} 
+                       onClick={() => toggleTag(tag)}
+                       className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${feedbackData.tags.includes(tag) ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}
                     >
-                        {tag}
+                       {tag}
                     </button>
                  ))}
               </div>
-
               <textarea 
-                placeholder="Conte mais detalhes (opcional)..." 
-                value={feedbackData.comment} 
-                onChange={e => setFeedbackData({...feedbackData, comment: e.target.value})} 
-                className={inputClass + " h-24 border-gray-800 placeholder:text-gray-700 font-medium text-xs"} 
+                 placeholder="Deixe um comentário adicional (opcional)..." 
+                 className={`${inputClass} mb-6 h-24 resize-none`}
+                 value={feedbackData.comment}
+                 onChange={e => setFeedbackData({...feedbackData, comment: e.target.value})}
               />
-              
-              <button onClick={handleFeedbackSubmit} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/20 hover:bg-blue-500 transition-all">
-                Enviar Avaliação
-              </button>
+              <div className="flex gap-4">
+                 <button onClick={() => setFeedbackTarget(null)} className="flex-1 py-3 bg-gray-950 rounded-xl text-xs font-black text-gray-500">Cancelar</button>
+                 <button onClick={handleFeedbackSubmit} className="flex-1 py-3 bg-blue-600 rounded-xl text-xs font-black text-white hover:bg-blue-500">Enviar Avaliação</button>
+              </div>
            </div>
         </div>
       )}

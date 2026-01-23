@@ -22,7 +22,8 @@ export interface User {
   isApproved?: boolean;
   isPriority?: boolean; // Novo campo para motoristas prioritários
   availableDates?: string[]; 
-  dayRoutes?: Record<string, { start: string, end: string }>; // Rota específica por dia
+  // Rota específica por dia agora inclui horário
+  dayRoutes?: Record<string, { start: string, end: string, time: string }>; 
   routeStart?: string;
   routeEnd?: string;
 }
@@ -35,6 +36,7 @@ export interface TripRequest {
   origin: string;
   destination: string;
   date: string;
+  time: string; // Novo campo de horário
   seats: number;
   price: number;
   status: 'PENDING' | 'ASSIGNED' | 'PAID' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'POSTPONED';

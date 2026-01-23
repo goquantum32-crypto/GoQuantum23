@@ -18,12 +18,16 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
 
   useEffect(() => { setProfileData({ ...user }); }, [user]);
 
-  const saveDayConfig = (date: string, start: string, end: string) => {
+  const saveDayConfig = (date: string, start: string, end: string, time: string) => {
     if (!date) {
       alert('Por favor, escolha uma data.');
       return;
     }
-    const updatedDayRoutes = { ...(profileData.dayRoutes || {}), [date]: { start, end } };
+    if (!time) {
+      alert('Por favor, defina um horário de partida.');
+      return;
+    }
+    const updatedDayRoutes = { ...(profileData.dayRoutes || {}), [date]: { start, end, time } };
     const currentDates = profileData.availableDates || [];
     const updatedDates = currentDates.includes(date) ? currentDates : [...currentDates, date];
     
@@ -96,7 +100,11 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
                       <p className="text-blue-500 text-center my-1 text-[10px]">⬇</p>
                       <p className="text-xs font-bold text-white">{(profileData.dayRoutes?.[date]?.end || 'Indefinida')}</p>
                    </div>
-                   <button onClick={() => setSelectedDayConfig(date)} className="w-full py-3 bg-gray-900 border border-gray-800 rounded-xl text-[9px] font-black uppercase tracking-widest text-blue-500 hover:bg-gray-800 transition-all">Alterar Rota</button>
+                   <div className="bg-gray-900 p-3 rounded-2xl border border-gray-800 text-center">
+                      <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Partida:</p>
+                      <p className="text-xl font-black text-blue-400">{(profileData.dayRoutes?.[date]?.time || '--:--')}</p>
+                   </div>
+                   <button onClick={() => setSelectedDayConfig(date)} className="w-full py-3 bg-gray-900 border border-gray-800 rounded-xl text-[9px] font-black uppercase tracking-widest text-blue-500 hover:bg-gray-800 transition-all">Alterar Rota/Hora</button>
                 </div>
               ))}
               {(profileData.availableDates || []).length === 0 && (
@@ -114,7 +122,7 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
            <div className="bg-gray-900 p-12 rounded-[4rem] border border-gray-800 w-full max-w-md space-y-8 shadow-2xl animate-in zoom-in-95 duration-300">
               <div className="text-center">
                  <h4 className="text-2xl font-black text-white uppercase tracking-tighter">Gestão de Agenda</h4>
-                 <p className="text-blue-500 font-black text-[10px] mt-2 uppercase tracking-widest">Escolha a Data e a Rota para este dia</p>
+                 <p className="text-blue-500 font-black text-[10px] mt-2 uppercase tracking-widest">Escolha a Data, Hora e Rota</p>
               </div>
               
               <div className="space-y-6">
@@ -127,17 +135,26 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
                       defaultValue={selectedDayConfig} 
                     />
                  </div>
+                 <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Horário de Partida:</label>
+                    <input 
+                      type="time" 
+                      id="timePicker" 
+                      className={inputClass} 
+                      defaultValue={profileData.dayRoutes?.[selectedDayConfig]?.time || ''} 
+                    />
+                 </div>
                  <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Início da Rota:</label>
-                       <select id="startSelect" className={inputClass}>
-                          {MOZ_ROUTES.map(r => <option key={r} value={r} selected={profileData.dayRoutes?.[selectedDayConfig]?.start === r}>{r}</option>)}
+                       <select id="startSelect" className={inputClass} defaultValue={profileData.dayRoutes?.[selectedDayConfig]?.start}>
+                          {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
                        </select>
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Fim da Rota:</label>
-                       <select id="endSelect" className={inputClass}>
-                          {MOZ_ROUTES.map(r => <option key={r} value={r} selected={profileData.dayRoutes?.[selectedDayConfig]?.end === r}>{r}</option>)}
+                       <select id="endSelect" className={inputClass} defaultValue={profileData.dayRoutes?.[selectedDayConfig]?.end}>
+                          {MOZ_ROUTES.map(r => <option key={r} value={r}>{r}</option>)}
                        </select>
                     </div>
                  </div>
@@ -148,13 +165,14 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
                  <button 
                    onClick={() => {
                      const date = (document.getElementById('datePicker') as HTMLInputElement).value;
+                     const time = (document.getElementById('timePicker') as HTMLInputElement).value;
                      const start = (document.getElementById('startSelect') as HTMLSelectElement).value;
                      const end = (document.getElementById('endSelect') as HTMLSelectElement).value;
-                     saveDayConfig(date, start, end);
+                     saveDayConfig(date, start, end, time);
                    }} 
                    className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/20 hover:bg-blue-500 transition-all"
                  >
-                   Guardar Dia
+                   Guardar
                  </button>
               </div>
            </div>
@@ -173,6 +191,7 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
                          <p className="text-white font-black">{t.origin} ➜ {t.destination}</p>
                       </div>
                       <p className="text-xs text-gray-500 mt-2 font-bold">{t.passengerName} • {t.passengerPhone}</p>
+                      <p className="text-xs text-blue-400 mt-1 font-bold">Horário: {t.time}</p>
                    </div>
                    <div className="text-right flex items-center space-x-8">
                       <div>
