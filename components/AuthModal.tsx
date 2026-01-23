@@ -7,7 +7,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (user: User) => void;
-  onRegister: (user: User) => Promise<void> | void; // Atualizado para aceitar Promise
+  onRegister: (user: User) => Promise<void> | void; 
   users: User[];
   initialMode?: 'LOGIN' | 'REGISTER';
   initialRole?: UserRole;
@@ -19,34 +19,30 @@ const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [role, setRole] = useState<UserRole>(UserRole.PASSENGER);
-  const [isLoading, setIsLoading] = useState(false); // Novo estado de carregamento
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', password: '', 
     vehicleNumber: '', vehicleColor: '', vehicleModel: '', availableSeats: '15',
     photoUrl: '', licenseUrl: ''
   });
 
-  // Segurança: Estados para Rate Limiting (Proteção contra força bruta)
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTimer, setLockoutTimer] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
-      // Reset form
       setFormData({
         name: '', email: '', phone: '', password: '', 
         vehicleNumber: '', vehicleColor: '', vehicleModel: '', availableSeats: '15',
         photoUrl: '', licenseUrl: ''
       });
-      // Set initial mode
       setIsRegistering(initialMode === 'REGISTER');
       setRole(initialRole);
       setIsLoading(false);
     }
   }, [isOpen, initialMode, initialRole]);
 
-  // Efeito para gerir o temporizador de bloqueio
   useEffect(() => {
     let interval: any;
     if (isLocked && lockoutTimer > 0) {
@@ -65,17 +61,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photoUrl' | 'licenseUrl') => {
     const file = e.target.files?.[0];
     if (file) {
-      // Verificação de segurança básica do tipo de ficheiro
       if (!file.type.startsWith('image/')) {
         alert('Apenas ficheiros de imagem são permitidos.');
         return;
       }
-      // Limite de tamanho (ex: 2MB) para evitar ataques DoS de memória
       if (file.size > 2 * 1024 * 1024) {
         alert('A imagem é demasiado grande. Máximo 2MB.');
         return;
       }
-
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, [field]: reader.result as string }));
@@ -86,9 +79,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return; // Prevenir múltiplos cliques
+    if (isLoading) return;
     
-    // Segurança: Verificar bloqueio
     if (isLocked) {
       alert(`Muitas tentativas falhadas. Aguarde ${lockoutTimer} segundos.`);
       return;
@@ -97,16 +89,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      // Segurança: Sanitização dos Inputs
       const cleanEmail = sanitizeInput(formData.email.trim());
-      const cleanPassword = formData.password; // Senha não sanitizamos para não alterar hash, mas validamos
+      const cleanPassword = formData.password;
       const cleanName = sanitizeInput(formData.name);
       const cleanPhone = sanitizeInput(formData.phone);
       const cleanVehicleNumber = sanitizeInput(formData.vehicleNumber);
 
       const adminEmail = "goquantum32@gmail.com";
 
-      // 1. Verificar Admin (Usando verificação ofuscada)
       if (!isRegistering && cleanEmail === adminEmail) {
         if (checkAdminCredentials(cleanPassword)) {
           onLogin({
@@ -119,32 +109,35 @@ const AuthModal: React.FC<AuthModalProps> = ({
           setLoginAttempts(0);
           return;
         } else {
-          // Falha no login admin
           handleLoginFailure();
           return;
         }
       }
 
-      // 2. Registo de Novo Utilizador
       if (isRegistering) {
+        // Correção Segura: Criar objeto base e adicionar propriedades de motorista apenas se necessário.
+        // Isto evita criar propriedades com valor 'undefined', que o Firebase rejeita.
+        
         const newUser: User = {
           id: 'u-' + Date.now(),
           name: cleanName,
           email: cleanEmail,
           phone: cleanPhone,
-          password: cleanPassword, // Em app real, isto seria hash
+          password: cleanPassword, 
           role: role,
-          vehicleNumber: cleanVehicleNumber,
-          vehicleColor: sanitizeInput(formData.vehicleColor),
-          vehicleModel: sanitizeInput(formData.vehicleModel),
-          availableSeats: role === UserRole.DRIVER ? parseInt(formData.availableSeats) : undefined,
-          photoUrl: formData.photoUrl,
-          licenseUrl: formData.licenseUrl
+          photoUrl: formData.photoUrl || '',
+          licenseUrl: formData.licenseUrl || ''
         };
+
+        if (role === UserRole.DRIVER) {
+          newUser.vehicleNumber = cleanVehicleNumber;
+          newUser.vehicleColor = sanitizeInput(formData.vehicleColor);
+          newUser.vehicleModel = sanitizeInput(formData.vehicleModel);
+          newUser.availableSeats = parseInt(formData.availableSeats) || 15;
+        }
+        
         await onRegister(newUser);
-      } 
-      // 3. Login Normal
-      else {
+      } else {
         const user = users.find(u => u.email === cleanEmail && u.password === cleanPassword);
         if (user) {
           onLogin(user);
@@ -154,7 +147,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
         }
       }
     } catch (error) {
-      console.error("Erro no processo:", error);
+      console.error("Erro no AuthModal (interface):", error);
+      // O erro já foi tratado no App.tsx ou relançado
     } finally {
       setIsLoading(false);
     }
@@ -165,8 +159,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setLoginAttempts(newAttempts);
     if (newAttempts >= 3) {
       setIsLocked(true);
-      setLockoutTimer(30); // Bloqueia por 30 segundos
-      alert('Muitas tentativas incorretas. O login foi bloqueado por 30 segundos por segurança.');
+      setLockoutTimer(30);
+      alert('Muitas tentativas incorretas. O login foi bloqueado por 30 segundos.');
     } else {
       alert(`Dados incorretos. Tentativa ${newAttempts} de 3.`);
     }
@@ -187,7 +181,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           </h2>
           <div className="flex items-center justify-center gap-2 mt-2">
              <span className="text-blue-500 font-bold uppercase tracking-widest text-xs">Sistema GoQuantum</span>
-             <span className="bg-green-900/30 text-green-500 text-[8px] px-2 py-0.5 rounded border border-green-900/50 font-black uppercase">Seguro v2.0</span>
+             <span className="bg-green-900/30 text-green-500 text-[8px] px-2 py-0.5 rounded border border-green-900/50 font-black uppercase">Seguro v2.2</span>
           </div>
         </div>
 
