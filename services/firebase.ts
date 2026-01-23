@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
+// Configuração atualizada do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCxsbgeg-CIG2wNOy33TeGHtuycMLEmRrA",
   authDomain: "goquantum-243a6.firebaseapp.com",

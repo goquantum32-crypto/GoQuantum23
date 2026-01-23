@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User, TripRequest, PackageRequest, PackageSize } from '../types';
 import { MOZ_ROUTES, calculatePrice } from '../constants';
 
@@ -28,6 +28,14 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'RESERVE' | 'PACKAGES' | 'PROFILE'>('RESERVE');
   
+  // State para o Perfil (Edição)
+  const [profileForm, setProfileForm] = useState(user);
+
+  // Sincronizar formulário se o utilizador atualizar externamente
+  useEffect(() => {
+    setProfileForm(user);
+  }, [user]);
+
   // State do Feedback
   const [feedbackTarget, setFeedbackTarget] = useState<{id: string, type: 'TRIP' | 'PACKAGE'} | null>(null);
   const [feedbackData, setFeedbackData] = useState<{rating: number, comment: string, tags: string[]}>({ 
@@ -107,6 +115,28 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
      }
   };
 
+  // Upload de Foto de Perfil
+  const handleProfilePhotoUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('A imagem é demasiado grande. Máximo 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileForm(prev => ({ ...prev, photoUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateUser(profileForm);
+    alert('Perfil atualizado com sucesso!');
+  };
+
   const inputClass = "w-full p-4 rounded-2xl bg-gray-950 border border-gray-800 text-white font-bold outline-none focus:ring-2 focus:ring-blue-600 transition-all";
 
   // Determinar quais tags mostrar baseado no rating e tipo
@@ -139,7 +169,7 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
       </div>
 
       {activeTab === 'RESERVE' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in slide-in-from-bottom-4">
           <div className="lg:col-span-7 space-y-8">
             {/* Form de Reserva */}
             <div className="bg-gray-900 p-10 rounded-[2.5rem] border border-gray-800 shadow-xl">
@@ -324,7 +354,7 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
       )}
 
       {activeTab === 'PACKAGES' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in slide-in-from-bottom-4">
            <div className="bg-gray-900 p-10 rounded-[2.5rem] border border-gray-800 shadow-xl">
               <h3 className="text-2xl font-black text-white mb-8">Novo Pedido de Encomenda</h3>
               <form onSubmit={(e) => { e.preventDefault(); onSubmitPackage({id: 'PKG-'+Math.random().toString(36).substr(2,6).toUpperCase(), passengerId: user.id, senderName: user.name, senderPhone: user.phone, ...pkgForm, price: 0, status: 'REQUESTED'}); alert('Pedido de carga enviado com sucesso! O Admin entrará em contato com a cotação.'); }} className="space-y-6">
@@ -428,6 +458,58 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
                 )
               })}
            </div>
+        </div>
+      )}
+
+      {/* --- ABA DE PERFIL (ADICIONADA) --- */}
+      {activeTab === 'PROFILE' && (
+        <div className="max-w-2xl mx-auto bg-gray-900 p-10 rounded-[2.5rem] border border-gray-800 shadow-xl space-y-8 animate-in slide-in-from-bottom-4">
+           <h3 className="text-2xl font-black text-white text-center">Meu Perfil</h3>
+           
+           <div className="flex flex-col items-center space-y-4">
+              <div className="relative group">
+                 <img src={profileForm.photoUrl || 'https://via.placeholder.com/150'} className="w-32 h-32 rounded-full object-cover border-4 border-gray-800 shadow-2xl" />
+                 <label className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full cursor-pointer hover:bg-blue-500 transition-all shadow-lg group-hover:scale-110">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoUpdate} />
+                 </label>
+              </div>
+              <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Toque no ícone para alterar a foto</p>
+           </div>
+
+           <form onSubmit={handleSaveProfile} className="space-y-6">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Nome Completo</label>
+                 <input 
+                    type="text" 
+                    value={profileForm.name} 
+                    onChange={e => setProfileForm({...profileForm, name: e.target.value})} 
+                    className={inputClass} 
+                 />
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Telefone</label>
+                 <input 
+                    type="tel" 
+                    value={profileForm.phone} 
+                    onChange={e => setProfileForm({...profileForm, phone: e.target.value})} 
+                    className={inputClass} 
+                 />
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Email</label>
+                 <input 
+                    type="email" 
+                    value={profileForm.email} 
+                    onChange={e => setProfileForm({...profileForm, email: e.target.value})} 
+                    className={inputClass} 
+                 />
+              </div>
+              
+              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 hover:bg-blue-500 transition-all">
+                 Salvar Alterações
+              </button>
+           </form>
         </div>
       )}
 
