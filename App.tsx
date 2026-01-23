@@ -7,7 +7,8 @@ import PassengerArea from './components/PassengerArea';
 import DriverArea from './components/DriverArea';
 import AdminArea from './components/AdminArea';
 import AuthModal from './components/AuthModal';
-import { validateUserStructure } from './utils/security';
+import { db } from './services/firebase';
+import { ref, onValue, set, update } from 'firebase/database';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -17,49 +18,100 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [view, setView] = useState<'LANDING' | 'PASSENGER' | 'DRIVER' | 'ADMIN'>('LANDING');
 
+  // 1. Sincronização em Tempo Real (Leitura)
   useEffect(() => {
-    try {
-      const savedTrips = localStorage.getItem('gq_trips');
-      const savedPackages = localStorage.getItem('gq_packages');
-      const savedUsers = localStorage.getItem('gq_users');
-      
-      // Validação de Segurança Básica ao carregar
-      if (savedTrips) setTrips(JSON.parse(savedTrips));
-      if (savedPackages) setPackages(JSON.parse(savedPackages));
-      
-      if (savedUsers) {
-        const parsedUsers = JSON.parse(savedUsers);
-        // Filtra utilizadores mal formados que podem ter sido injetados
-        const validUsers = Array.isArray(parsedUsers) ? parsedUsers.filter(validateUserStructure) : [];
-        setUsers(validUsers);
+    // Escutar Utilizadores
+    const usersRef = ref(db, 'users');
+    const unsubscribeUsers = onValue(usersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        // Converte objeto Firebase em Array
+        const usersArray = Object.values(data) as User[];
+        setUsers(usersArray);
+        
+        // Atualiza o utilizador atual se os seus dados mudarem remotamente (ex: aprovação do admin)
+        if (currentUser) {
+          const updatedCurrent = usersArray.find(u => u.id === currentUser.id);
+          if (updatedCurrent) {
+            setCurrentUser(updatedCurrent);
+          }
+        }
+      } else {
+        setUsers([]);
       }
-    } catch (e) {
-      console.error("Erro ao carregar ou validar dados locais. Dados corrompidos foram ignorados.", e);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('gq_trips', JSON.stringify(trips));
-      localStorage.setItem('gq_packages', JSON.stringify(packages));
-      localStorage.setItem('gq_users', JSON.stringify(users));
-    } catch (e) {
-      console.warn("LocalStorage cheio. As fotos podem ser demasiado grandes para guardar localmente.", e);
-      // Não bloqueia a aplicação, apenas avisa no console
-    }
-  }, [trips, packages, users]);
+    // Escutar Viagens
+    const tripsRef = ref(db, 'trips');
+    const unsubscribeTrips = onValue(tripsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setTrips(Object.values(data) as TripRequest[]);
+      } else {
+        setTrips([]);
+      }
+    });
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsers(prevUsers => prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u));
-    // Atualiza o utilizador atual sem causar perda de sessão
-    if (currentUser?.id === updatedUser.id) {
-      setCurrentUser(updatedUser);
-    }
+    // Escutar Encomendas
+    const packagesRef = ref(db, 'packages');
+    const unsubscribePackages = onValue(packagesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setPackages(Object.values(data) as PackageRequest[]);
+      } else {
+        setPackages([]);
+      }
+    });
+
+    // Cleanup listeners ao desmontar
+    return () => {
+      unsubscribeUsers();
+      unsubscribeTrips();
+      unsubscribePackages();
+    };
+  }, [currentUser?.id]); // Dependência apenas do ID para atualizar referência interna
+
+  // 2. Funções de Escrita no Firebase
+  
+  // Registo de novo utilizador ou Login
+  const handleRegisterUser = (newUser: User) => {
+    set(ref(db, `users/${newUser.id}`), newUser)
+      .then(() => {
+        handleLogin(newUser);
+      })
+      .catch((error) => console.error("Erro ao registar:", error));
   };
 
+  const handleUpdateUser = (updatedUser: User) => {
+    // Atualiza apenas os campos necessários na base de dados
+    update(ref(db, `users/${updatedUser.id}`), updatedUser)
+      .catch((error) => console.error("Erro ao atualizar utilizador:", error));
+  };
+
+  // Gestão de Viagens
+  const handleSubmitTrip = (trip: TripRequest) => {
+    set(ref(db, `trips/${trip.id}`), trip);
+  };
+
+  const handleUpdateTrip = (updatedTrip: TripRequest) => {
+    update(ref(db, `trips/${updatedTrip.id}`), updatedTrip);
+  };
+
+  // Gestão de Encomendas
+  const handleSubmitPackage = (pkg: PackageRequest) => {
+    set(ref(db, `packages/${pkg.id}`), pkg);
+  };
+
+  const handleUpdatePackage = (updatedPkg: PackageRequest) => {
+    update(ref(db, `packages/${updatedPkg.id}`), updatedPkg);
+  };
+
+  // Fluxo de Autenticação Local
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
+    
+    // Redirecionamento baseado no cargo
     if (user.role === UserRole.PASSENGER) setView('PASSENGER');
     else if (user.role === UserRole.DRIVER) setView('DRIVER');
     else if (user.role === UserRole.ADMIN) setView('ADMIN');
@@ -85,12 +137,12 @@ const App: React.FC = () => {
         {view === 'PASSENGER' && currentUser?.role === UserRole.PASSENGER && (
           <PassengerArea 
             user={currentUser} 
-            users={users}
+            users={users} // Passamos a lista completa sincronizada
             onUpdateUser={handleUpdateUser}
-            onSubmitTrip={(t) => setTrips(prev => [t, ...prev])} 
-            onUpdateTrip={(ut) => setTrips(prev => prev.map(t => t.id === ut.id ? ut : t))}
-            onSubmitPackage={(p) => setPackages(prev => [p, ...prev])}
-            onUpdatePackage={(up) => setPackages(prev => prev.map(p => p.id === up.id ? up : p))}
+            onSubmitTrip={handleSubmitTrip} 
+            onUpdateTrip={handleUpdateTrip}
+            onSubmitPackage={handleSubmitPackage}
+            onUpdatePackage={handleUpdatePackage}
             trips={trips.filter(t => t.passengerId === currentUser.id)} 
             packages={packages.filter(p => p.passengerId === currentUser.id)}
           />
@@ -102,7 +154,7 @@ const App: React.FC = () => {
             onUpdateUser={handleUpdateUser}
             trips={trips.filter(t => t.driverId === currentUser.id)} 
             packages={packages.filter(p => p.driverId === currentUser.id)} 
-            onUpdateTrip={(ut) => setTrips(prev => prev.map(t => t.id === ut.id ? ut : t))} 
+            onUpdateTrip={handleUpdateTrip} 
           />
         )}
 
@@ -111,9 +163,9 @@ const App: React.FC = () => {
             users={users} 
             onUpdateUser={handleUpdateUser}
             trips={trips} 
-            onUpdateTrip={(ut) => setTrips(prev => prev.map(t => t.id === ut.id ? ut : t))}
+            onUpdateTrip={handleUpdateTrip}
             packages={packages} 
-            onUpdatePackage={(up) => setPackages(prev => prev.map(p => p.id === up.id ? up : p))}
+            onUpdatePackage={handleUpdatePackage}
           />
         )}
       </main>
@@ -122,8 +174,8 @@ const App: React.FC = () => {
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
         onLogin={handleLogin}
-        users={users}
-        onRegister={(u) => { setUsers(prev => [...prev, u]); handleLogin(u); }}
+        users={users} // Lista sincronizada do Firebase para verificar login
+        onRegister={handleRegisterUser}
       />
     </div>
   );
