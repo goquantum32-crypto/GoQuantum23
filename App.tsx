@@ -79,15 +79,20 @@ const App: React.FC = () => {
   // 2. Funções de Escrita no Firebase
   
   // Registo de novo utilizador ou Login
-  const handleRegisterUser = (newUser: User) => {
-    set(ref(db, `users/${newUser.id}`), newUser)
-      .then(() => {
-        handleLogin(newUser);
-      })
-      .catch((error) => {
-        console.error("Erro ao registar:", error);
-        alert(`Erro ao criar conta: ${error.message}. Verifique a sua conexão ou tente novamente.`);
-      });
+  const handleRegisterUser = async (newUser: User) => {
+    try {
+      await set(ref(db, `users/${newUser.id}`), newUser);
+      handleLogin(newUser);
+      alert('Conta criada com sucesso! Bem-vindo ao GoQuantum.');
+    } catch (error: any) {
+      console.error("Erro ao registar:", error);
+      if (error.code === 'PERMISSION_DENIED') {
+         alert('Erro de Permissão: O banco de dados está bloqueado. Por favor, configure as Regras do Firebase para "read": true, "write": true.');
+      } else {
+         alert(`Erro ao criar conta: ${error.message}. Verifique a sua conexão.`);
+      }
+      throw error; // Re-lança para o modal saber que falhou
+    }
   };
 
   const handleUpdateUser = (updatedUser: User) => {

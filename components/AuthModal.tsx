@@ -7,7 +7,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (user: User) => void;
-  onRegister: (user: User) => void;
+  onRegister: (user: User) => Promise<void> | void; // Atualizado para aceitar Promise
   users: User[];
   initialMode?: 'LOGIN' | 'REGISTER';
   initialRole?: UserRole;
@@ -19,6 +19,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [role, setRole] = useState<UserRole>(UserRole.PASSENGER);
+  const [isLoading, setIsLoading] = useState(false); // Novo estado de carregamento
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', password: '', 
     vehicleNumber: '', vehicleColor: '', vehicleModel: '', availableSeats: '15',
@@ -41,6 +42,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
       // Set initial mode
       setIsRegistering(initialMode === 'REGISTER');
       setRole(initialRole);
+      setIsLoading(false);
     }
   }, [isOpen, initialMode, initialRole]);
 
@@ -84,6 +86,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return; // Prevenir múltiplos cliques
     
     // Segurança: Verificar bloqueio
     if (isLocked) {
@@ -91,61 +94,69 @@ const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    // Segurança: Sanitização dos Inputs
-    const cleanEmail = sanitizeInput(formData.email.trim());
-    const cleanPassword = formData.password; // Senha não sanitizamos para não alterar hash, mas validamos
-    const cleanName = sanitizeInput(formData.name);
-    const cleanPhone = sanitizeInput(formData.phone);
-    const cleanVehicleNumber = sanitizeInput(formData.vehicleNumber);
+    setIsLoading(true);
 
-    const adminEmail = "goquantum32@gmail.com";
+    try {
+      // Segurança: Sanitização dos Inputs
+      const cleanEmail = sanitizeInput(formData.email.trim());
+      const cleanPassword = formData.password; // Senha não sanitizamos para não alterar hash, mas validamos
+      const cleanName = sanitizeInput(formData.name);
+      const cleanPhone = sanitizeInput(formData.phone);
+      const cleanVehicleNumber = sanitizeInput(formData.vehicleNumber);
 
-    // 1. Verificar Admin (Usando verificação ofuscada)
-    if (!isRegistering && cleanEmail === adminEmail) {
-      if (checkAdminCredentials(cleanPassword)) {
-        onLogin({
-          id: 'adm-root',
-          name: 'Administrador Master',
-          email: adminEmail,
-          phone: '+258 844567470',
-          role: UserRole.ADMIN
-        });
-        setLoginAttempts(0);
-        return;
-      } else {
-        // Falha no login admin
-        handleLoginFailure();
-        return;
+      const adminEmail = "goquantum32@gmail.com";
+
+      // 1. Verificar Admin (Usando verificação ofuscada)
+      if (!isRegistering && cleanEmail === adminEmail) {
+        if (checkAdminCredentials(cleanPassword)) {
+          onLogin({
+            id: 'adm-root',
+            name: 'Administrador Master',
+            email: adminEmail,
+            phone: '+258 844567470',
+            role: UserRole.ADMIN
+          });
+          setLoginAttempts(0);
+          return;
+        } else {
+          // Falha no login admin
+          handleLoginFailure();
+          return;
+        }
       }
-    }
 
-    // 2. Registo de Novo Utilizador
-    if (isRegistering) {
-      const newUser: User = {
-        id: 'u-' + Date.now(),
-        name: cleanName,
-        email: cleanEmail,
-        phone: cleanPhone,
-        password: cleanPassword, // Em app real, isto seria hash
-        role: role,
-        vehicleNumber: cleanVehicleNumber,
-        vehicleColor: sanitizeInput(formData.vehicleColor),
-        vehicleModel: sanitizeInput(formData.vehicleModel),
-        availableSeats: role === UserRole.DRIVER ? parseInt(formData.availableSeats) : undefined,
-        photoUrl: formData.photoUrl,
-        licenseUrl: formData.licenseUrl
-      };
-      onRegister(newUser);
-    } 
-    // 3. Login Normal
-    else {
-      const user = users.find(u => u.email === cleanEmail && u.password === cleanPassword);
-      if (user) {
-        onLogin(user);
-        setLoginAttempts(0);
-      } else {
-        handleLoginFailure();
+      // 2. Registo de Novo Utilizador
+      if (isRegistering) {
+        const newUser: User = {
+          id: 'u-' + Date.now(),
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          password: cleanPassword, // Em app real, isto seria hash
+          role: role,
+          vehicleNumber: cleanVehicleNumber,
+          vehicleColor: sanitizeInput(formData.vehicleColor),
+          vehicleModel: sanitizeInput(formData.vehicleModel),
+          availableSeats: role === UserRole.DRIVER ? parseInt(formData.availableSeats) : undefined,
+          photoUrl: formData.photoUrl,
+          licenseUrl: formData.licenseUrl
+        };
+        await onRegister(newUser);
+      } 
+      // 3. Login Normal
+      else {
+        const user = users.find(u => u.email === cleanEmail && u.password === cleanPassword);
+        if (user) {
+          onLogin(user);
+          setLoginAttempts(0);
+        } else {
+          handleLoginFailure();
+        }
       }
+    } catch (error) {
+      console.error("Erro no processo:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -238,8 +249,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
 
           <input required type="password" placeholder="Palavra-passe" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
 
-          <button type="submit" disabled={isLocked} className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl mt-6 ${isLocked ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40'}`}>
-            {isRegistering ? 'Confirmar Registo' : 'Entrar Agora'}
+          <button type="submit" disabled={isLocked || isLoading} className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl mt-6 ${isLocked || isLoading ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40'}`}>
+            {isLoading ? 'A Processar...' : (isRegistering ? 'Confirmar Registo' : 'Entrar Agora')}
           </button>
         </form>
       </div>
