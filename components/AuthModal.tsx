@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { sanitizeInput, checkAdminCredentials } from '../utils/security';
+import { auth, googleProvider } from '../services/firebase';
+import { signInWithPopup } from 'firebase/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -77,6 +79,43 @@ const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (isLocked) return;
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const googleUser = result.user;
+
+      // 1. Verifica se o usuário já existe na nossa base de dados (Realtime DB)
+      const existingUser = users.find(u => u.email === googleUser.email);
+
+      if (existingUser) {
+        // Login direto se já existe
+        onLogin(existingUser);
+        setLoginAttempts(0);
+      } else {
+        // 2. Se não existe, cria um novo registo automático
+        const newUser: User = {
+          id: googleUser.uid, // Usa o UID do Firebase Auth
+          name: googleUser.displayName || 'Utilizador Google',
+          email: googleUser.email || '',
+          phone: googleUser.phoneNumber || '', // Google nem sempre retorna telefone
+          role: UserRole.PASSENGER, // Google Login padrão para Passageiro
+          photoUrl: googleUser.photoURL || '',
+          password: 'google-auth-secured', // Placeholder seguro
+        };
+        
+        // Regista na base de dados (App.tsx vai salvar no Firebase)
+        await onRegister(newUser);
+      }
+    } catch (error: any) {
+      console.error("Erro no Login Google:", error);
+      alert("Erro ao entrar com Google: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
@@ -115,9 +154,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
       }
 
       if (isRegistering) {
-        // Correção Segura: Criar objeto base e adicionar propriedades de motorista apenas se necessário.
-        // Isto evita criar propriedades com valor 'undefined', que o Firebase rejeita.
-        
         const newUser: User = {
           id: 'u-' + Date.now(),
           name: cleanName,
@@ -148,7 +184,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (error) {
       console.error("Erro no AuthModal (interface):", error);
-      // O erro já foi tratado no App.tsx ou relançado
     } finally {
       setIsLoading(false);
     }
@@ -192,61 +227,91 @@ const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="flex bg-gray-950 p-1.5 rounded-2xl mb-6 border border-gray-800">
+        <div className="space-y-5">
+          <div className="flex bg-gray-950 p-1.5 rounded-2xl mb-2 border border-gray-800">
             <button type="button" onClick={() => setIsRegistering(false)} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${!isRegistering ? 'bg-gray-800 shadow-md text-blue-400' : 'text-gray-500'}`}>Login</button>
             <button type="button" onClick={() => setIsRegistering(true)} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isRegistering ? 'bg-gray-800 shadow-md text-blue-400' : 'text-gray-500'}`}>Registo</button>
           </div>
 
-          {isRegistering && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-               <div className="bg-gray-950 p-5 rounded-3xl border border-gray-800">
-                <label className="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest text-center">Tipo de Conta</label>
+          {/* GOOGLE SIGN IN BUTTON */}
+          <button 
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={isLocked || isLoading}
+            className="w-full bg-white text-gray-900 hover:bg-gray-100 py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 transition-all shadow-lg"
+          >
+            {isLoading ? (
+               <span className="animate-pulse">A Conectar...</span>
+            ) : (
+               <>
+                 <svg className="w-5 h-5" viewBox="0 0 24 24">
+                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                 </svg>
+                 Entrar com Google
+               </>
+            )}
+          </button>
+
+          <div className="flex items-center gap-4 py-2">
+             <div className="h-px bg-gray-800 flex-1"></div>
+             <span className="text-gray-600 text-[10px] font-black uppercase tracking-widest">OU EMAIL</span>
+             <div className="h-px bg-gray-800 flex-1"></div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {isRegistering && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="bg-gray-950 p-5 rounded-3xl border border-gray-800">
+                  <label className="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest text-center">Tipo de Conta</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setRole(UserRole.PASSENGER)} className={`py-3 rounded-xl text-xs font-bold border-2 transition-all ${role === UserRole.PASSENGER ? 'border-blue-600 bg-blue-900/20 text-blue-400' : 'border-gray-800 bg-gray-900 text-gray-500'}`}>Passageiro</button>
+                    <button type="button" onClick={() => setRole(UserRole.DRIVER)} className={`py-3 rounded-xl text-xs font-bold border-2 transition-all ${role === UserRole.DRIVER ? 'border-blue-600 bg-blue-900/20 text-blue-400' : 'border-gray-800 bg-gray-900 text-gray-500'}`}>Motorista</button>
+                  </div>
+                </div>
+
+                <input required type="text" placeholder="Nome Completo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} maxLength={50} />
+                <input required type="tel" placeholder="Telefone (+258)" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={inputClass} maxLength={15} />
+              </div>
+            )}
+
+            <input required type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} maxLength={100} />
+
+            {isRegistering && role === UserRole.DRIVER && (
+              <div className="space-y-4 pt-4 border-t border-gray-800 animate-in fade-in duration-500">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Foto Perfil</label>
+                    <div className="relative group overflow-hidden bg-gray-950 border border-gray-800 rounded-2xl h-24 flex items-center justify-center cursor-pointer">
+                        <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'photoUrl')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
+                        {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" /> : <span className="text-gray-600 text-[10px] font-bold">CARREGAR</span>}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Carta Condução</label>
+                    <div className="relative group overflow-hidden bg-gray-950 border border-gray-800 rounded-2xl h-24 flex items-center justify-center cursor-pointer">
+                        <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'licenseUrl')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
+                        {formData.licenseUrl ? <img src={formData.licenseUrl} className="w-full h-full object-cover" /> : <span className="text-gray-600 text-[10px] font-bold">CARREGAR</span>}
+                    </div>
+                  </div>
+                </div>
+                <input required type="text" placeholder="Matrícula" value={formData.vehicleNumber} onChange={e => setFormData({...formData, vehicleNumber: e.target.value})} className={inputClass} maxLength={20} />
                 <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setRole(UserRole.PASSENGER)} className={`py-3 rounded-xl text-xs font-bold border-2 transition-all ${role === UserRole.PASSENGER ? 'border-blue-600 bg-blue-900/20 text-blue-400' : 'border-gray-800 bg-gray-900 text-gray-500'}`}>Passageiro</button>
-                  <button type="button" onClick={() => setRole(UserRole.DRIVER)} className={`py-3 rounded-xl text-xs font-bold border-2 transition-all ${role === UserRole.DRIVER ? 'border-blue-600 bg-blue-900/20 text-blue-400' : 'border-gray-800 bg-gray-900 text-gray-500'}`}>Motorista</button>
+                  <input required type="text" placeholder="Modelo do Carro" value={formData.vehicleModel} onChange={e => setFormData({...formData, vehicleModel: e.target.value})} className={inputClass} maxLength={30} />
+                  <input required type="text" placeholder="Cor" value={formData.vehicleColor} onChange={e => setFormData({...formData, vehicleColor: e.target.value})} className={inputClass} maxLength={20} />
                 </div>
               </div>
+            )}
 
-              <input required type="text" placeholder="Nome Completo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} maxLength={50} />
-              <input required type="tel" placeholder="Telefone (+258)" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={inputClass} maxLength={15} />
-            </div>
-          )}
+            <input required type="password" placeholder="Palavra-passe" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
 
-          <input required type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} maxLength={100} />
-
-          {isRegistering && role === UserRole.DRIVER && (
-            <div className="space-y-4 pt-4 border-t border-gray-800 animate-in fade-in duration-500">
-               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Foto Perfil</label>
-                   <div className="relative group overflow-hidden bg-gray-950 border border-gray-800 rounded-2xl h-24 flex items-center justify-center cursor-pointer">
-                      <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'photoUrl')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
-                      {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" /> : <span className="text-gray-600 text-[10px] font-bold">CARREGAR</span>}
-                   </div>
-                 </div>
-                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Carta Condução</label>
-                   <div className="relative group overflow-hidden bg-gray-950 border border-gray-800 rounded-2xl h-24 flex items-center justify-center cursor-pointer">
-                      <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'licenseUrl')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
-                      {formData.licenseUrl ? <img src={formData.licenseUrl} className="w-full h-full object-cover" /> : <span className="text-gray-600 text-[10px] font-bold">CARREGAR</span>}
-                   </div>
-                 </div>
-               </div>
-               <input required type="text" placeholder="Matrícula" value={formData.vehicleNumber} onChange={e => setFormData({...formData, vehicleNumber: e.target.value})} className={inputClass} maxLength={20} />
-               <div className="grid grid-cols-2 gap-3">
-                 <input required type="text" placeholder="Modelo do Carro" value={formData.vehicleModel} onChange={e => setFormData({...formData, vehicleModel: e.target.value})} className={inputClass} maxLength={30} />
-                 <input required type="text" placeholder="Cor" value={formData.vehicleColor} onChange={e => setFormData({...formData, vehicleColor: e.target.value})} className={inputClass} maxLength={20} />
-               </div>
-            </div>
-          )}
-
-          <input required type="password" placeholder="Palavra-passe" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
-
-          <button type="submit" disabled={isLocked || isLoading} className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl mt-6 ${isLocked || isLoading ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40'}`}>
-            {isLoading ? 'A Processar...' : (isRegistering ? 'Confirmar Registo' : 'Entrar Agora')}
-          </button>
-        </form>
+            <button type="submit" disabled={isLocked || isLoading} className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl mt-6 ${isLocked || isLoading ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40'}`}>
+              {isLoading ? 'A Processar...' : (isRegistering ? 'Confirmar Registo' : 'Entrar Agora')}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
