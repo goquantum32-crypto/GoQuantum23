@@ -47,6 +47,28 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
     onUpdateUser(updated);
   };
 
+  // Funções para Perfil
+  const handleProfilePhotoUpdate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('A imagem é demasiado grande. Máximo 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileData(prev => ({ ...prev, photoUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateUser(profileData);
+    alert('Perfil de motorista atualizado com sucesso!');
+  };
+
   const inputClass = "w-full p-4 rounded-2xl bg-gray-950 border border-gray-800 text-white font-bold outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm";
 
   return (
@@ -54,9 +76,14 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
       {/* Header do Motorista */}
       <div className="bg-gray-900 p-8 rounded-[3rem] shadow-2xl border border-gray-800 flex flex-col md:flex-row justify-between items-center gap-6 animate-in fade-in duration-500">
         <div className="flex items-center space-x-6">
-           <div className="relative">
-              <img src={user.photoUrl || 'https://via.placeholder.com/150'} className="w-20 h-20 rounded-[1.5rem] object-cover border-2 border-blue-600 shadow-xl" />
+           <div className="relative group cursor-pointer">
+              <img src={profileData.photoUrl || 'https://via.placeholder.com/150'} className="w-20 h-20 rounded-[1.5rem] object-cover border-2 border-blue-600 shadow-xl" />
               <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-4 border-gray-900 rounded-full"></div>
+              {/* Overlay de Edição Rápida */}
+              <div className="absolute inset-0 bg-black/50 rounded-[1.5rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <input type="file" accept="image/*" onChange={handleProfilePhotoUpdate} className="absolute inset-0 opacity-0 cursor-pointer" />
+              </div>
            </div>
            <div>
              <h2 className="text-2xl font-black text-white">{user.name}</h2>
@@ -205,6 +232,63 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
               {trips.filter(t => t.status !== 'COMPLETED').length === 0 && <p className="text-gray-600 italic text-center py-20">Sem viagens agendadas para o momento.</p>}
            </div>
         </div>
+      )}
+
+      {/* --- ABA MEU PERFIL (ADICIONADA) --- */}
+      {activeTab === 'PROFILE' && (
+         <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4">
+            <h3 className="text-2xl font-black text-white mb-8">Editar Perfil Motorista</h3>
+            <form onSubmit={handleSaveProfile} className="space-y-8">
+               
+               {/* Secção da Foto */}
+               <div className="flex flex-col items-center justify-center space-y-4">
+                  <div className="relative group w-32 h-32">
+                     <img src={profileData.photoUrl || 'https://via.placeholder.com/150'} className="w-full h-full rounded-full object-cover border-4 border-gray-800 group-hover:border-blue-500 transition-all" />
+                     <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
+                        <span className="text-xs font-bold text-white uppercase">Alterar</span>
+                        <input type="file" accept="image/*" onChange={handleProfilePhotoUpdate} className="absolute inset-0 opacity-0 cursor-pointer" />
+                     </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Toque na foto para alterar</p>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-5 bg-gray-950 p-6 rounded-[2rem] border border-gray-800">
+                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">Dados Pessoais</p>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Nome Completo</label>
+                        <input type="text" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} className={inputClass} />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Telefone</label>
+                        <input type="tel" value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} className={inputClass} />
+                     </div>
+                  </div>
+
+                  <div className="space-y-5 bg-gray-950 p-6 rounded-[2rem] border border-gray-800">
+                     <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-4">Dados da Viatura</p>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Matrícula</label>
+                        <input type="text" value={profileData.vehicleNumber} onChange={e => setProfileData({...profileData, vehicleNumber: e.target.value})} className={inputClass} />
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Modelo</label>
+                           <input type="text" value={profileData.vehicleModel} onChange={e => setProfileData({...profileData, vehicleModel: e.target.value})} className={inputClass} />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Cor</label>
+                           <input type="text" value={profileData.vehicleColor} onChange={e => setProfileData({...profileData, vehicleColor: e.target.value})} className={inputClass} />
+                        </div>
+                     </div>
+                  </div>
+               </div>
+
+               <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-sm uppercase hover:bg-blue-500 transition-all shadow-xl shadow-blue-900/30">
+                 Guardar Alterações
+               </button>
+            </form>
+         </div>
       )}
     </div>
   );

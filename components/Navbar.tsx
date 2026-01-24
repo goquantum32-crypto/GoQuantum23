@@ -17,7 +17,11 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLoginClick, onLogout, onViewCha
           className="flex items-center space-x-3 cursor-pointer group" 
           onClick={() => onViewChange('LANDING')}
         >
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-900/40 group-hover:rotate-6 transition-all">GQ</div>
+          {/* Ícone GQ Original Restaurado */}
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-900 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40 border border-blue-500/30 group-hover:rotate-3 transition-transform duration-300">
+            <span className="text-white font-black text-xl tracking-tighter">GQ</span>
+          </div>
+
           <span className="text-xl font-black text-white tracking-tighter hidden sm:block">GoQuantum</span>
         </div>
 

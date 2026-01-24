@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, TripRequest, PackageRequest } from './types';
 import Navbar from './components/Navbar';
@@ -23,8 +22,9 @@ const App: React.FC = () => {
 
   const [view, setView] = useState<'LANDING' | 'PASSENGER' | 'DRIVER' | 'ADMIN'>('LANDING');
 
-  // Estado para controlar modo offline/demo
+  // Estado para controlar modo offline/demo e erro
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [firebaseError, setFirebaseError] = useState<string>("");
 
   // 1. Sincronização em Tempo Real (Leitura)
   useEffect(() => {
@@ -33,6 +33,8 @@ const App: React.FC = () => {
       const usersRef = ref(db, 'users');
       const unsubscribeUsers = onValue(usersRef, (snapshot) => {
         const data = snapshot.val();
+        setIsOfflineMode(false); // Conexão bem sucedida
+        setFirebaseError("");
         if (data) {
           const usersArray = Object.values(data) as User[];
           setUsers(usersArray);
@@ -45,8 +47,9 @@ const App: React.FC = () => {
           setUsers([]);
         }
       }, (error) => {
-        console.warn("Firebase bloqueado ou offline. Ativando modo local.", error);
+        console.warn("Firebase bloqueado ou offline.", error);
         setIsOfflineMode(true);
+        setFirebaseError(error.message || "Erro de permissão ou conexão");
       });
 
       // Escutar Viagens
@@ -70,9 +73,10 @@ const App: React.FC = () => {
         unsubscribeTrips();
         unsubscribePackages();
       };
-    } catch (e) {
+    } catch (e: any) {
       console.error("Erro fatal ao conectar Firebase:", e);
       setIsOfflineMode(true);
+      setFirebaseError(e.message || "Erro desconhecido");
     }
   }, [currentUser?.id]);
 
@@ -105,6 +109,7 @@ const App: React.FC = () => {
         setUsers(localUsers);
         handleLogin(newUser);
         setIsOfflineMode(true);
+        setFirebaseError("Modo Manual (Erro ao Registar)");
         alert('Bem-vindo! Você está operando em Modo Offline.');
       } else {
         throw error; // Relança para o modal saber que falhou
@@ -191,8 +196,9 @@ const App: React.FC = () => {
       />
       
       {isOfflineMode && (
-        <div className="bg-orange-600 text-white text-xs font-black text-center py-1 uppercase tracking-widest">
-          ⚠ Modo Offline / Demo Ativado
+        <div className="bg-orange-600 text-white text-xs font-black text-center py-2 uppercase tracking-widest flex items-center justify-center gap-2">
+          <span>⚠ Modo Offline Ativado:</span>
+          <span className="bg-black/20 px-2 py-0.5 rounded text-[10px] lowercase font-mono">{firebaseError || "Conexão falhou"}</span>
         </div>
       )}
 
