@@ -30,6 +30,7 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
   
   // State para o Perfil (Edição)
   const [profileForm, setProfileForm] = useState(user);
+  const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
 
   // Sincronizar formulário se o utilizador atualizar externamente
   useEffect(() => {
@@ -141,7 +142,22 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
     alert('Perfil atualizado com sucesso!');
   };
 
-  const inputClass = "w-full p-4 rounded-2xl bg-gray-950 border border-gray-800 text-white font-bold outline-none focus:ring-2 focus:ring-blue-600 transition-all";
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      alert('As novas senhas não coincidem.');
+      return;
+    }
+    if (passwordData.oldPassword !== user.password) {
+      alert('A senha antiga está incorreta.');
+      return;
+    }
+    onUpdateUser({ ...profileForm, password: passwordData.newPassword });
+    setPasswordData({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+    alert('Senha alterada com sucesso!');
+  };
+
+  const inputClass = "w-full p-4 rounded-2xl bg-gray-950 border border-gray-800 text-white font-bold outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm";
 
   // Determinar quais tags mostrar baseado no rating e tipo
   const currentTags = useMemo(() => {
@@ -427,8 +443,8 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
       )}
 
       {activeTab === 'PROFILE' && (
-         <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4">
-            <h3 className="text-2xl font-black text-white mb-8">Editar Perfil</h3>
+         <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4 space-y-8">
+            <h3 className="text-2xl font-black text-white">Editar Perfil</h3>
             <form onSubmit={handleSaveProfile} className="space-y-6">
                <div className="flex justify-center mb-6">
                   <div className="relative group w-32 h-32">
@@ -448,49 +464,39 @@ const PassengerArea: React.FC<PassengerAreaProps> = ({
                      <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Telefone</label>
                      <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className={inputClass} />
                   </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Email</label>
-                     <input type="email" value={profileForm.email} disabled className={`${inputClass} opacity-50 cursor-not-allowed`} />
-                  </div>
                </div>
-               <button type="submit" className="w-full bg-gray-800 text-white py-4 rounded-2xl font-black text-sm uppercase hover:bg-gray-700 transition-all">Guardar Alterações</button>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Email</label>
+                  <input type="email" value={profileForm.email} onChange={e => setProfileForm({...profileForm, email: e.target.value})} className={inputClass} />
+               </div>
+               <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-sm uppercase hover:bg-blue-500 transition-all shadow-xl shadow-blue-900/20">Guardar Alterações</button>
             </form>
-         </div>
-      )}
 
-      {/* Modal de Feedback */}
-      {feedbackTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
-           <div className="bg-gray-900 p-8 rounded-[2.5rem] w-full max-w-md border border-gray-800">
-              <h4 className="text-xl font-black text-center text-white mb-6">Avaliar Experiência</h4>
-              <div className="flex justify-center space-x-2 mb-6">
-                 {[1,2,3,4,5].map(star => (
-                    <button key={star} onClick={() => setFeedbackData({...feedbackData, rating: star})} className={`text-3xl transition-transform hover:scale-125 ${star <= feedbackData.rating ? 'text-yellow-500' : 'text-gray-700'}`}>★</button>
-                 ))}
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 mb-6">
-                 {currentTags.map(tag => (
-                    <button 
-                       key={tag} 
-                       onClick={() => toggleTag(tag)}
-                       className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${feedbackData.tags.includes(tag) ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}
-                    >
-                       {tag}
-                    </button>
-                 ))}
-              </div>
-              <textarea 
-                 placeholder="Deixe um comentário adicional (opcional)..." 
-                 className={`${inputClass} mb-6 h-24 resize-none`}
-                 value={feedbackData.comment}
-                 onChange={e => setFeedbackData({...feedbackData, comment: e.target.value})}
-              />
-              <div className="flex gap-4">
-                 <button onClick={() => setFeedbackTarget(null)} className="flex-1 py-3 bg-gray-950 rounded-xl text-xs font-black text-gray-500">Cancelar</button>
-                 <button onClick={handleFeedbackSubmit} className="flex-1 py-3 bg-blue-600 rounded-xl text-xs font-black text-white hover:bg-blue-500">Enviar Avaliação</button>
-              </div>
-           </div>
-        </div>
+            {/* Secção de Segurança (Troca de Senha) - ADICIONADA */}
+            <div className="bg-gray-950 p-8 rounded-[2.5rem] border border-gray-800 mt-8">
+               <h4 className="text-xl font-black text-white mb-6 flex items-center gap-2">
+                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                 Segurança
+               </h4>
+               <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Senha Atual</label>
+                     <input type="password" value={passwordData.oldPassword} onChange={e => setPasswordData({...passwordData, oldPassword: e.target.value})} className={inputClass} placeholder="Digite a sua senha atual" required />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Nova Senha</label>
+                        <input type="password" value={passwordData.newPassword} onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})} className={inputClass} placeholder="Nova senha" required />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Confirmar Nova Senha</label>
+                        <input type="password" value={passwordData.confirmNewPassword} onChange={e => setPasswordData({...passwordData, confirmNewPassword: e.target.value})} className={inputClass} placeholder="Repita a nova senha" required />
+                     </div>
+                  </div>
+                  <button type="submit" className="px-8 py-4 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl font-black text-xs uppercase hover:bg-gray-800 hover:text-white transition-all">Alterar Senha</button>
+               </form>
+            </div>
+         </div>
       )}
     </div>
   );

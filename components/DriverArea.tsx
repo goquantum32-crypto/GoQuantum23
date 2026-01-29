@@ -16,6 +16,9 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
   const [profileData, setProfileData] = useState({ ...user });
   const [selectedDayConfig, setSelectedDayConfig] = useState<string | null>(null);
 
+  // States para Troca de Senha
+  const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+
   useEffect(() => { setProfileData({ ...user }); }, [user]);
 
   const saveDayConfig = (date: string, start: string, end: string, time: string) => {
@@ -67,6 +70,21 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
     e.preventDefault();
     onUpdateUser(profileData);
     alert('Perfil de motorista atualizado com sucesso!');
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      alert('As novas senhas não coincidem.');
+      return;
+    }
+    if (passwordData.oldPassword !== user.password) {
+      alert('A senha antiga está incorreta.');
+      return;
+    }
+    onUpdateUser({ ...profileData, password: passwordData.newPassword });
+    setPasswordData({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+    alert('Senha alterada com sucesso!');
   };
 
   const inputClass = "w-full p-4 rounded-2xl bg-gray-950 border border-gray-800 text-white font-bold outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm";
@@ -234,13 +252,13 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
         </div>
       )}
 
-      {/* --- ABA MEU PERFIL (ADICIONADA) --- */}
+      {/* --- ABA MEU PERFIL (ATUALIZADA) --- */}
       {activeTab === 'PROFILE' && (
-         <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4">
-            <h3 className="text-2xl font-black text-white mb-8">Editar Perfil Motorista</h3>
+         <div className="bg-gray-900 p-10 rounded-[3rem] border border-gray-800 animate-in slide-in-from-bottom-4 space-y-8">
+            <h3 className="text-2xl font-black text-white">Editar Perfil Motorista</h3>
+            
+            {/* Secção de Dados e Viatura */}
             <form onSubmit={handleSaveProfile} className="space-y-8">
-               
-               {/* Secção da Foto */}
                <div className="flex flex-col items-center justify-center space-y-4">
                   <div className="relative group w-32 h-32">
                      <img src={profileData.photoUrl || 'https://via.placeholder.com/150'} className="w-full h-full rounded-full object-cover border-4 border-gray-800 group-hover:border-blue-500 transition-all" />
@@ -288,6 +306,31 @@ const DriverArea: React.FC<DriverAreaProps> = ({ user, onUpdateUser, trips, pack
                  Guardar Alterações
                </button>
             </form>
+
+            {/* Secção de Segurança (Troca de Senha) */}
+            <div className="bg-gray-950 p-8 rounded-[2.5rem] border border-gray-800 mt-8">
+               <h4 className="text-xl font-black text-white mb-6 flex items-center gap-2">
+                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                 Segurança
+               </h4>
+               <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Senha Atual</label>
+                     <input type="password" value={passwordData.oldPassword} onChange={e => setPasswordData({...passwordData, oldPassword: e.target.value})} className={inputClass} placeholder="Digite a sua senha atual" required />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Nova Senha</label>
+                        <input type="password" value={passwordData.newPassword} onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})} className={inputClass} placeholder="Nova senha" required />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Confirmar Nova Senha</label>
+                        <input type="password" value={passwordData.confirmNewPassword} onChange={e => setPasswordData({...passwordData, confirmNewPassword: e.target.value})} className={inputClass} placeholder="Repita a nova senha" required />
+                     </div>
+                  </div>
+                  <button type="submit" className="px-8 py-4 bg-gray-900 border border-gray-800 text-gray-300 rounded-xl font-black text-xs uppercase hover:bg-gray-800 hover:text-white transition-all">Alterar Senha</button>
+               </form>
+            </div>
          </div>
       )}
     </div>

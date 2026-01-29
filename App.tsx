@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, TripRequest, PackageRequest } from './types';
 import Navbar from './components/Navbar';
@@ -9,18 +10,42 @@ import AuthModal from './components/AuthModal';
 import { db } from './services/firebase';
 import { ref, onValue, set, update } from 'firebase/database';
 
+// Chaves para o LocalStorage
+const CACHE_KEY_USERS = 'gq_users_cache';
+const CACHE_KEY_SESSION = 'gq_user_session';
+
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Tenta carregar a sessão salva imediatamente ao iniciar
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem(CACHE_KEY_SESSION);
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [trips, setTrips] = useState<TripRequest[]>([]);
   const [packages, setPackages] = useState<PackageRequest[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  
+  // Inicializa users com o cache para evitar "Erro de dados incorretos" enquanto o Firebase carrega
+  const [users, setUsers] = useState<User[]>(() => {
+    const cached = localStorage.getItem(CACHE_KEY_USERS);
+    return cached ? JSON.parse(cached) : [];
+  });
   
   // Auth State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [authInitialRole, setAuthInitialRole] = useState<UserRole>(UserRole.PASSENGER);
 
-  const [view, setView] = useState<'LANDING' | 'PASSENGER' | 'DRIVER' | 'ADMIN'>('LANDING');
+  // Define a view inicial baseada na sessão recuperada
+  const [view, setView] = useState<'LANDING' | 'PASSENGER' | 'DRIVER' | 'ADMIN'>(() => {
+    const saved = localStorage.getItem(CACHE_KEY_SESSION);
+    if (saved) {
+      const user = JSON.parse(saved);
+      if (user.role === UserRole.PASSENGER) return 'PASSENGER';
+      if (user.role === UserRole.DRIVER) return 'DRIVER';
+      if (user.role === UserRole.ADMIN) return 'ADMIN';
+    }
+    return 'LANDING';
+  });
 
   // Estado para controlar modo offline/demo e erro
   const [isOfflineMode, setIsOfflineMode] = useState(false);
@@ -38,13 +63,20 @@ const App: React.FC = () => {
         if (data) {
           const usersArray = Object.values(data) as User[];
           setUsers(usersArray);
+          // Atualiza o Cache Local
+          localStorage.setItem(CACHE_KEY_USERS, JSON.stringify(usersArray));
           
           if (currentUser) {
             const updatedCurrent = usersArray.find(u => u.id === currentUser.id);
-            if (updatedCurrent) setCurrentUser(updatedCurrent);
+            if (updatedCurrent) {
+              setCurrentUser(updatedCurrent);
+              // Atualiza a sessão salva com dados frescos
+              localStorage.setItem(CACHE_KEY_SESSION, JSON.stringify(updatedCurrent));
+            }
           }
         } else {
-          setUsers([]);
+          // Se vier vazio do Firebase, não limpamos o cache imediatamente para segurança
+          // setUsers([]); 
         }
       }, (error) => {
         console.warn("Firebase bloqueado ou offline.", error);
@@ -86,17 +118,20 @@ const App: React.FC = () => {
     try {
       console.log("Tentando registar no Firebase...", newUser);
       
-      // Sanitização: Firebase rejeita valores 'undefined'. 
-      // JSON.stringify remove automaticamente chaves com valor undefined.
       const userToSave = JSON.parse(JSON.stringify(newUser));
 
       await set(ref(db, `users/${newUser.id}`), userToSave);
+      
+      // Atualizar cache local manualmente para garantir login imediato
+      const newUsersList = [...users, newUser];
+      setUsers(newUsersList);
+      localStorage.setItem(CACHE_KEY_USERS, JSON.stringify(newUsersList));
+
       alert('Conta criada com sucesso no servidor!');
       handleLogin(newUser);
     } catch (error: any) {
       console.error("Erro no Firebase:", error);
       
-      // Fallback para LocalStorage (Modo Demo)
       const errorMsg = error.code === 'PERMISSION_DENIED' 
         ? 'Aviso: Banco de dados bloqueado (Permissões).' 
         : 'Aviso: Erro de conexão com o servidor.';
@@ -104,25 +139,30 @@ const App: React.FC = () => {
       const confirmOffline = window.confirm(`${errorMsg}\n\nDeseja entrar no "Modo Offline" para testar o sistema? (Os dados serão salvos apenas neste dispositivo).`);
       
       if (confirmOffline) {
-        // Simular salvamento
         const localUsers = [...users, newUser];
         setUsers(localUsers);
+        localStorage.setItem(CACHE_KEY_USERS, JSON.stringify(localUsers)); // Persistir offline
         handleLogin(newUser);
         setIsOfflineMode(true);
         setFirebaseError("Modo Manual (Erro ao Registar)");
         alert('Bem-vindo! Você está operando em Modo Offline.');
       } else {
-        throw error; // Relança para o modal saber que falhou
+        throw error;
       }
     }
   };
 
   const handleUpdateUser = (updatedUser: User) => {
     if (isOfflineMode) {
-      setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
-      if (currentUser?.id === updatedUser.id) setCurrentUser(updatedUser);
+      const updatedList = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+      setUsers(updatedList);
+      localStorage.setItem(CACHE_KEY_USERS, JSON.stringify(updatedList));
+      
+      if (currentUser?.id === updatedUser.id) {
+        setCurrentUser(updatedUser);
+        localStorage.setItem(CACHE_KEY_SESSION, JSON.stringify(updatedUser));
+      }
     } else {
-      // Também sanitizamos aqui por segurança
       const userToSave = JSON.parse(JSON.stringify(updatedUser));
       update(ref(db, `users/${updatedUser.id}`), userToSave)
         .catch(err => console.error("Erro update:", err));
@@ -174,6 +214,8 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    // Salvar Sessão
+    localStorage.setItem(CACHE_KEY_SESSION, JSON.stringify(user));
     setIsAuthModalOpen(false);
     
     if (user.role === UserRole.PASSENGER) setView('PASSENGER');
@@ -183,6 +225,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(CACHE_KEY_SESSION);
     setView('LANDING');
   };
 
