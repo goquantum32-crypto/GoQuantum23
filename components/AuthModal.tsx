@@ -108,7 +108,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const cleanEmail = sanitizeInput(formData.email.trim());
+      // Normalizar email para minúsculas para evitar erros de case-sensitivity
+      const cleanEmail = sanitizeInput(formData.email.trim().toLowerCase());
       const cleanPassword = formData.password;
 
       // Lógica de Registo
@@ -148,6 +149,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
       // Lógica de Login
       if (viewMode === 'LOGIN') {
         const adminEmail = "goquantum32@gmail.com";
+        
+        // Login Admin
         if (cleanEmail === adminEmail) {
           if (checkAdminCredentials(cleanPassword)) {
             onLogin({
@@ -165,7 +168,15 @@ const AuthModal: React.FC<AuthModalProps> = ({
           }
         }
 
-        const user = users.find(u => u.email === cleanEmail && u.password === cleanPassword);
+        // Validação se a lista de utilizadores está vazia (pode ser delay de conexão)
+        if ((!users || users.length === 0) && cleanEmail !== adminEmail) {
+           // Tenta verificar se é o primeiro uso ou falha de rede, mas permite falhar normalmente
+           console.warn("Lista de utilizadores vazia no momento do login.");
+        }
+
+        // Login User Normal (Comparando email em lowercase)
+        const user = users.find(u => u.email.toLowerCase() === cleanEmail && u.password === cleanPassword);
+        
         if (user) {
           onLogin(user);
           setLoginAttempts(0);
@@ -175,6 +186,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (error) {
       console.error("Erro no AuthModal:", error);
+      alert("Ocorreu um erro inesperado ao tentar entrar. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
@@ -187,10 +199,10 @@ const AuthModal: React.FC<AuthModalProps> = ({
     try {
       if (recoveryStep === 1) {
         // Passo 1: Verificar Identidade (Email + Telefone)
-        const email = sanitizeInput(recoveryData.email.trim());
+        const email = sanitizeInput(recoveryData.email.trim().toLowerCase());
         const phone = sanitizeInput(recoveryData.phone.trim());
         
-        const user = users.find(u => u.email === email && u.phone === phone);
+        const user = users.find(u => u.email.toLowerCase() === email && u.phone === phone);
 
         if (user) {
           setUserToRecover(user);
@@ -231,7 +243,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
       setLockoutTimer(30);
       alert('Muitas tentativas incorretas. O login foi bloqueado por 30 segundos.');
     } else {
-      alert(`Dados incorretos. Tentativa ${newAttempts} de 3.`);
+      alert(`Dados incorretos (Email ou Senha). Tentativa ${newAttempts} de 3.`);
     }
   };
 
