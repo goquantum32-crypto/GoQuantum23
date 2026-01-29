@@ -1,8 +1,7 @@
-import * as firebaseApp from "firebase/app";
+import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
-import * as firebaseAuth from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-// Configuração atualizada do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCxsbgeg-CIG2wNOy33TeGHtuycMLEmRrA",
   authDomain: "goquantum-243a6.firebaseapp.com",
@@ -13,7 +12,7 @@ const firebaseConfig = {
   appId: "1:209723251492:web:a00ef826c651777d7cf1b1"
 };
 
-const app = firebaseApp.initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
-export const auth = firebaseAuth.getAuth(app);
-export const googleProvider = new firebaseAuth.GoogleAuthProvider();
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();

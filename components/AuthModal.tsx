@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { sanitizeInput, checkAdminCredentials } from '../utils/security';
@@ -32,14 +31,10 @@ const AuthModal: React.FC<AuthModalProps> = ({
   });
 
   // Estados para Recuperação
-  // Step 1: Email, Step 2: Código, Step 3: Nova Senha
+  // Step 1: Identificação (Email + Phone), Step 2: Nova Senha
   const [recoveryStep, setRecoveryStep] = useState(1); 
-  const [recoveryData, setRecoveryData] = useState({ email: '', newPassword: '', confirmNewPassword: '' });
+  const [recoveryData, setRecoveryData] = useState({ email: '', phone: '', newPassword: '', confirmNewPassword: '' });
   const [userToRecover, setUserToRecover] = useState<User | null>(null);
-  
-  // Lógica do Código de Verificação
-  const [generatedCode, setGeneratedCode] = useState<string>('');
-  const [inputCode, setInputCode] = useState<string>('');
 
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
@@ -59,11 +54,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
       vehicleNumber: '', vehicleColor: '', vehicleModel: '', availableSeats: '15',
       photoUrl: '', licenseUrl: ''
     });
-    setRecoveryData({ email: '', newPassword: '', confirmNewPassword: '' });
+    setRecoveryData({ email: '', phone: '', newPassword: '', confirmNewPassword: '' });
     setRecoveryStep(1);
     setUserToRecover(null);
-    setGeneratedCode('');
-    setInputCode('');
     setIsLoading(false);
     setShowPassword(false);
     setShowConfirmPassword(false);
@@ -193,37 +186,21 @@ const AuthModal: React.FC<AuthModalProps> = ({
     
     try {
       if (recoveryStep === 1) {
-        // Passo 1: Enviar Código
+        // Passo 1: Verificar Identidade (Email + Telefone)
         const email = sanitizeInput(recoveryData.email.trim());
-        const user = users.find(u => u.email === email);
+        const phone = sanitizeInput(recoveryData.phone.trim());
+        
+        const user = users.find(u => u.email === email && u.phone === phone);
 
         if (user) {
           setUserToRecover(user);
-          // Gerar código de 6 dígitos
-          const code = Math.floor(100000 + Math.random() * 900000).toString();
-          setGeneratedCode(code);
-          
-          // SIMULAÇÃO DE ENVIO DE EMAIL
-          setTimeout(() => {
-            alert(`[SIMULAÇÃO DE EMAIL]\n\nOlá ${user.name},\nO seu código de verificação GoQuantum é: ${code}\n\n(Copie este código para continuar)`);
-            setRecoveryStep(2);
-            setIsLoading(false);
-          }, 1500); // Pequeno delay para parecer real
-          
+          setRecoveryStep(2);
         } else {
-          alert("Não encontramos uma conta com este Email.");
+          alert("Dados incorretos. Verifique se o Email e o Telefone correspondem à sua conta.");
           setIsLoading(false);
         }
-      } else if (recoveryStep === 2) {
-        // Passo 2: Verificar Código
-        if (inputCode === generatedCode) {
-          setRecoveryStep(3);
-        } else {
-          alert("Código incorreto. Por favor verifique o seu email novamente.");
-        }
-        setIsLoading(false);
       } else {
-        // Passo 3: Redefinir Senha
+        // Passo 2: Definir Nova Senha
         if (recoveryData.newPassword !== recoveryData.confirmNewPassword) {
           alert("As senhas não coincidem.");
           setIsLoading(false);
@@ -231,17 +208,17 @@ const AuthModal: React.FC<AuthModalProps> = ({
         }
         if (!userToRecover) return;
         
-        // Simular atualização
+        // Atualizar utilizador
         const updatedUser = { ...userToRecover, password: recoveryData.newPassword };
         await onRegister(updatedUser); 
         
-        alert("Senha redefinida com sucesso! Por favor, faça login.");
+        alert("Senha redefinida com sucesso! Por favor, faça login com a nova senha.");
         resetForm();
         setViewMode('LOGIN');
       }
     } catch (err) {
       console.error(err);
-      alert("Erro ao processar pedido.");
+      alert("Erro ao processar o pedido. Tente novamente.");
       setIsLoading(false);
     }
   };
@@ -284,3 +261,180 @@ const AuthModal: React.FC<AuthModalProps> = ({
           </h2>
           <div className="flex items-center justify-center gap-2 mt-2">
              <span className="text-blue-500 font-bold uppercase tracking-widest text-xs">Sistema GoQuantum</span>
+             <span className="bg-green-900/30 text-green-500 text-[8px] px-2 py-0.5 rounded border border-green-900/50 font-black uppercase">Seguro v2.2</span>
+          </div>
+        </div>
+
+        {isLocked && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-900/50 rounded-2xl text-center animate-pulse">
+            <p className="text-red-500 font-bold text-sm">Bloqueio de Segurança Ativo</p>
+            <p className="text-gray-400 text-xs mt-1">Tente novamente em {lockoutTimer}s</p>
+          </div>
+        )}
+
+        {/* Abas de Navegação (Escondidas no Modo Recuperação) */}
+        {viewMode !== 'RECOVERY' && (
+          <div className="flex bg-gray-950 p-1.5 rounded-2xl mb-6 border border-gray-800">
+            <button type="button" onClick={() => setViewMode('LOGIN')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'LOGIN' ? 'bg-gray-800 shadow-md text-blue-400' : 'text-gray-500'}`}>Login</button>
+            <button type="button" onClick={() => setViewMode('REGISTER')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'REGISTER' ? 'bg-gray-800 shadow-md text-blue-400' : 'text-gray-500'}`}>Registo</button>
+          </div>
+        )}
+
+        {/* --- FORMULÁRIO DE LOGIN / REGISTO --- */}
+        {viewMode !== 'RECOVERY' && (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {viewMode === 'REGISTER' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="bg-gray-950 p-5 rounded-3xl border border-gray-800">
+                  <label className="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest text-center">Tipo de Conta</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setRole(UserRole.PASSENGER)} className={`py-3 rounded-xl text-xs font-bold border-2 transition-all ${role === UserRole.PASSENGER ? 'border-blue-600 bg-blue-900/20 text-blue-400' : 'border-gray-800 bg-gray-900 text-gray-500'}`}>Passageiro</button>
+                    <button type="button" onClick={() => setRole(UserRole.DRIVER)} className={`py-3 rounded-xl text-xs font-bold border-2 transition-all ${role === UserRole.DRIVER ? 'border-blue-600 bg-blue-900/20 text-blue-400' : 'border-gray-800 bg-gray-900 text-gray-500'}`}>Motorista</button>
+                  </div>
+                </div>
+
+                <input required type="text" placeholder="Nome Completo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} maxLength={50} />
+                <input required type="tel" placeholder="Telefone (+258)" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={inputClass} maxLength={15} />
+              </div>
+            )}
+
+            <input required type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={inputClass} maxLength={100} />
+
+            {/* Campos Específicos do Motorista */}
+            {viewMode === 'REGISTER' && role === UserRole.DRIVER && (
+              <div className="space-y-4 pt-4 border-t border-gray-800 animate-in fade-in duration-500">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Foto Perfil</label>
+                    <div className="relative group overflow-hidden bg-gray-950 border border-gray-800 rounded-2xl h-24 flex items-center justify-center cursor-pointer">
+                        <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'photoUrl')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
+                        {formData.photoUrl ? <img src={formData.photoUrl} className="w-full h-full object-cover" /> : <span className="text-gray-600 text-[10px] font-bold">CARREGAR</span>}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2 tracking-widest">Carta Condução</label>
+                    <div className="relative group overflow-hidden bg-gray-950 border border-gray-800 rounded-2xl h-24 flex items-center justify-center cursor-pointer">
+                        <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'licenseUrl')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
+                        {formData.licenseUrl ? <img src={formData.licenseUrl} className="w-full h-full object-cover" /> : <span className="text-gray-600 text-[10px] font-bold">CARREGAR</span>}
+                    </div>
+                  </div>
+                </div>
+                <input required type="text" placeholder="Matrícula" value={formData.vehicleNumber} onChange={e => setFormData({...formData, vehicleNumber: e.target.value})} className={inputClass} maxLength={20} />
+                <div className="grid grid-cols-2 gap-3">
+                  <input required type="text" placeholder="Modelo do Carro" value={formData.vehicleModel} onChange={e => setFormData({...formData, vehicleModel: e.target.value})} className={inputClass} maxLength={30} />
+                  <input required type="text" placeholder="Cor" value={formData.vehicleColor} onChange={e => setFormData({...formData, vehicleColor: e.target.value})} className={inputClass} maxLength={20} />
+                </div>
+              </div>
+            )}
+
+            {/* Campo de Senha com Ícone de Olho */}
+            <div className="relative">
+              <input 
+                required 
+                type={showPassword ? "text" : "password"} 
+                placeholder="Palavra-passe" 
+                value={formData.password} 
+                onChange={e => setFormData({...formData, password: e.target.value})} 
+                className={`${inputClass} pr-12`} 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)} 
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+              >
+                {eyeIcon(showPassword)}
+              </button>
+            </div>
+
+            {/* Campo de Confirmar Senha (Apenas Registo) */}
+            {viewMode === 'REGISTER' && (
+              <div className="relative animate-in fade-in duration-300">
+                <input 
+                  required 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  placeholder="Confirmar Palavra-passe" 
+                  value={formData.confirmPassword} 
+                  onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
+                  className={`${inputClass} pr-12`} 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)} 
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                >
+                  {eyeIcon(showConfirmPassword)}
+                </button>
+              </div>
+            )}
+
+            {viewMode === 'LOGIN' && (
+              <div className="flex justify-end">
+                <button 
+                  type="button"
+                  onClick={() => setViewMode('RECOVERY')}
+                  className="text-xs font-bold text-blue-500 hover:text-blue-400 hover:underline"
+                >
+                  Esqueci a senha
+                </button>
+              </div>
+            )}
+
+            <button type="submit" disabled={isLocked || isLoading} className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl mt-6 ${isLocked || isLoading ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40'}`}>
+              {isLoading ? 'A Processar...' : (viewMode === 'REGISTER' ? 'Confirmar Registo' : 'Entrar Agora')}
+            </button>
+          </form>
+        )}
+
+        {/* --- FLUXO DE RECUPERAÇÃO DE SENHA --- */}
+        {viewMode === 'RECOVERY' && (
+          <form onSubmit={handleRecoverySubmit} className="space-y-6 animate-in slide-in-from-right-4">
+             <div className="bg-gray-950 p-6 rounded-[2rem] border border-gray-800 text-center">
+                <p className="text-gray-400 text-sm mb-2">
+                  {recoveryStep === 1 ? 'Confirme a sua identidade para continuar.' : 'Defina a sua nova palavra-passe.'}
+                </p>
+                <div className="flex justify-center gap-2 mt-4">
+                   <div className={`h-2 w-2 rounded-full transition-all ${recoveryStep >= 1 ? 'bg-blue-500 scale-125' : 'bg-gray-700'}`}></div>
+                   <div className={`h-2 w-2 rounded-full transition-all ${recoveryStep >= 2 ? 'bg-blue-500 scale-125' : 'bg-gray-700'}`}></div>
+                </div>
+             </div>
+
+             {/* PASSO 1: Email e Telefone */}
+             {recoveryStep === 1 && (
+               <div className="space-y-4 animate-in fade-in">
+                 <input required type="email" placeholder="Email Registado" value={recoveryData.email} onChange={e => setRecoveryData({...recoveryData, email: e.target.value})} className={inputClass} />
+                 <input required type="tel" placeholder="Telefone Registado" value={recoveryData.phone} onChange={e => setRecoveryData({...recoveryData, phone: e.target.value})} className={inputClass} />
+               </div>
+             )}
+
+             {/* PASSO 2: Nova Senha */}
+             {recoveryStep === 2 && (
+               <div className="space-y-4 animate-in fade-in">
+                 <div className="bg-green-900/20 p-4 rounded-xl border border-green-900/50 mb-4">
+                    <p className="text-green-500 text-xs font-bold text-center">Identidade Verificada: {userToRecover?.name}</p>
+                 </div>
+                 <div className="relative">
+                    <input required type={showPassword ? "text" : "password"} placeholder="Nova Senha" value={recoveryData.newPassword} onChange={e => setRecoveryData({...recoveryData, newPassword: e.target.value})} className={inputClass} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">{eyeIcon(showPassword)}</button>
+                 </div>
+                 <div className="relative">
+                    <input required type={showConfirmPassword ? "text" : "password"} placeholder="Confirmar Nova Senha" value={recoveryData.confirmNewPassword} onChange={e => setRecoveryData({...recoveryData, confirmNewPassword: e.target.value})} className={inputClass} />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">{eyeIcon(showConfirmPassword)}</button>
+                 </div>
+               </div>
+             )}
+
+             <div className="flex gap-4 pt-2">
+               <button type="button" onClick={() => { setViewMode('LOGIN'); resetForm(); }} className="flex-1 py-4 bg-gray-950 border border-gray-800 text-gray-500 rounded-2xl font-black text-sm uppercase hover:bg-gray-900 transition-all">Cancelar</button>
+               <button type="submit" disabled={isLoading} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase hover:bg-blue-500 shadow-lg transition-all disabled:opacity-50">
+                 {isLoading ? 'A Processar...' : (recoveryStep === 1 ? 'Verificar' : 'Alterar Senha')}
+               </button>
+             </div>
+          </form>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+export default AuthModal;
